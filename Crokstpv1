@@ -1,7 +1,6 @@
 -- ============================================================
--- CROKS HUB — v31
--- Auto Steal + Anti-Trap + Bypass (Lennon) + Anti-Ragdoll + Auto Bat
--- Autor: Kevin | Discord: _.kevib._
+-- CROKS HUB — v32
+-- Auto Steal (Lennon) + Bypass (Lennon) + Auto Bat + Anti-Trap + Anti-Ragdoll
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -13,28 +12,40 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local LP      = Players.LocalPlayer
 
+-- ============================================================
+-- CONFIG
+-- ============================================================
 local CONFIG = {
     FOREST_POS    = Vector3.new(596, 68, -328),
     SAFEZONE_POS  = Vector3.new(456, 67, -364),
     ESPERA_KNOCK  = 60,
-    TWEEN_SPEED   = 500,
     BAT_RANGE     = 12,
     BAT_CD        = 0.25,
 }
 
 -- ============================================================
--- BYPASS — Desync Lennon-style (resolve bug do boss)
+-- LOG
+-- ============================================================
+local LOG = {}
+local logInicio = os.clock()
+local function addLog(msg)
+    local t = string.format("[%.2fs] %s", os.clock() - logInicio, tostring(msg))
+    table.insert(LOG, t)
+    print(t)
+end
+
+-- ============================================================
+-- BYPASS (Desync Lennon)
 -- ============================================================
 local Bypass = {
     Enabled = true, InProgress = false, Active = false,
     Original = nil, OriginalState = nil, Fake = nil, Char = nil,
-    StateConn = nil, DescConn = nil,
+    StateConn = nil,
 }
 
 local function dsSnapshot(h)
     return {
-        Archivable = h.Archivable,
-        BreakJointsOnDeath = h.BreakJointsOnDeath,
+        Archivable = h.Archivable, BreakJointsOnDeath = h.BreakJointsOnDeath,
         WalkSpeed = h.WalkSpeed, JumpPower = h.JumpPower,
         JumpHeight = h.JumpHeight, UseJumpPower = h.UseJumpPower,
         HipHeight = h.HipHeight, Health = h.Health,
@@ -67,7 +78,6 @@ function Bypass.Apply(character)
     pcall(function() fake.RequiresNeck = false end)
     fake.Health = fake.MaxHealth
 
-    -- move animator pro fake
     local anim = real:FindFirstChildOfClass("Animator")
     if anim then pcall(function() anim.Parent = fake end) end
 
@@ -97,20 +107,18 @@ function Bypass.Apply(character)
     Bypass.Fake = fake
     Bypass.Active = true
     Bypass.InProgress = false
+    addLog("[BYPASS] ON")
     return true
 end
 
 function Bypass.Remove()
     if Bypass.InProgress then return end
     Bypass.InProgress = true
-
     if Bypass.StateConn then pcall(function() Bypass.StateConn:Disconnect() end); Bypass.StateConn = nil end
-    if Bypass.DescConn  then pcall(function() Bypass.DescConn:Disconnect()  end); Bypass.DescConn  = nil end
 
     local char = Bypass.Char or LP.Character
     local real = Bypass.Original
     local fake = Bypass.Fake
-
     if fake then pcall(function() fake:Destroy() end) end
 
     if real and char then
@@ -144,6 +152,7 @@ function Bypass.Remove()
     Bypass.Active = false
     Bypass.InProgress = false
     Bypass.Enabled = true
+    addLog("[BYPASS] OFF")
 end
 
 function Bypass.IsActive()
@@ -154,10 +163,9 @@ function Bypass.Reativar() Bypass.Enabled = true end
 _G.CroksBypass = Bypass
 
 -- ============================================================
--- ANTI-RAGDOLL (Lennon-style: SetStateEnabled + Motor6D)
+-- ANTI-RAGDOLL
 -- ============================================================
 local AntiRagdollAtivo = true
-
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -168,7 +176,6 @@ task.spawn(function()
                 pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
                 pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
                 pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false) end)
-
                 local st = hum:GetState()
                 if st == Enum.HumanoidStateType.Ragdoll
                    or st == Enum.HumanoidStateType.Physics
@@ -188,28 +195,9 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- ANTI-HIT (health travado)
--- ============================================================
-local AntiHitAtivo = true
-local hitConn = nil
-
-local function blindarHealth(hum)
-    if not hum then return end
-    if hitConn then pcall(function() hitConn:Disconnect() end) end
-    local hpMax = hum.MaxHealth
-    hitConn = hum.HealthChanged:Connect(function(novo)
-        if not AntiHitAtivo then return end
-        if novo < hpMax and hum.Health < hpMax then
-            pcall(function() hum.Health = hpMax end)
-        end
-    end)
-end
-
--- ============================================================
 -- ANTI-TRAP
 -- ============================================================
 local AntiTrapAtivo = true
-
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -223,7 +211,6 @@ task.spawn(function()
         end
     end
 end)
-
 CS:GetInstanceAddedSignal("PlacedTrap"):Connect(function(trap)
     if AntiTrapAtivo and trap:GetAttribute("Owner") ~= LP.Name then
         task.defer(function()
@@ -232,58 +219,8 @@ CS:GetInstanceAddedSignal("PlacedTrap"):Connect(function(trap)
         end)
     end
 end)
-
 -- ============================================================
--- TWEEN TP (TweenService + Heartbeat)
--- ============================================================
-local tweenAtivo = nil
-local tweenConn  = nil
-
-local function pararTween()
-    if tweenConn then tweenConn:Disconnect(); tweenConn = nil end
-    if tweenAtivo then pcall(function() tweenAtivo:Cancel() end); tweenAtivo = nil end
-end
-
-local function TeleportarPara(destino)
-    local char = LP.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    pararTween()
-    local alvo = CFrame.new(destino + Vector3.new(0, 3, 0))
-    local dist = (hrp.Position - alvo.Position).Magnitude
-    if dist < 2 then
-        pcall(function()
-            hrp.CFrame = alvo
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-        end)
-        return true
-    end
-    local dur = dist / CONFIG.TWEEN_SPEED
-    tweenAtivo = TS:Create(hrp, TweenInfo.new(dur, Enum.EasingStyle.Linear), { CFrame = alvo })
-    tweenConn = RunService.Heartbeat:Connect(function()
-        if not tweenAtivo then return end
-        pcall(function()
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-        end)
-    end)
-    tweenAtivo.Completed:Connect(function()
-        pararTween()
-        pcall(function()
-            hrp.CFrame = alvo
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-        end)
-    end)
-    tweenAtivo:Play()
-    task.wait(dur + 0.1)
-    pararTween()
-    return true
-end
-
--- ============================================================
--- AUTO BAT — combat bot
+-- AUTO BAT
 -- ============================================================
 local AutoBatAtivo = false
 
@@ -343,17 +280,36 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- PEGAR OVO
+-- NETWORKING
 -- ============================================================
-local Networking = RS:WaitForChild("Packages", 10)
-Networking = Networking and Networking:WaitForChild("Networking", 10)
+local net = RS:FindFirstChild("Packages")
+net = net and net:FindFirstChild("Networking")
 
-local AskCarry, AskDrop
-if Networking then
-    AskCarry = Networking:FindFirstChild("RF/EggWorld/AskFieldEggCarry")
-    AskDrop  = Networking:FindFirstChild("RF/EggWorld/AskFieldEggDrop")
+local Carry, Drop
+if net then
+    Carry = net:FindFirstChild("RF/EggWorld/AskFieldEggCarry")
+    Drop  = net:FindFirstChild("RF/EggWorld/AskFieldEggDrop")
 end
 
+-- ============================================================
+-- TP HELPER
+-- ============================================================
+local function TeleportarPara(destino)
+    local char = LP.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    pcall(function()
+        hrp.CFrame = CFrame.new(destino + Vector3.new(0, 3, 0))
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end)
+    task.wait(0.2)
+    return true
+end
+
+-- ============================================================
+-- PEGAR OVO
+-- ============================================================
 local function PegarOvoProximidade()
     if not fireproximityprompt then return false end
     local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
@@ -371,6 +327,7 @@ local function PegarOvoProximidade()
     if melhor then pcall(function() fireproximityprompt(melhor, 0) end); return true end
     return false
 end
+
 -- ============================================================
 -- CICLO AUTO STEAL
 -- ============================================================
@@ -378,12 +335,12 @@ local AutoStealLigado = false
 local CicloAndando = false
 local TemOvo = false
 
-if Networking then
-    local FEC = Networking:FindFirstChild("RE/EggWorld/FieldEggCarry")
+if net then
+    local FEC = net:FindFirstChild("RE/EggWorld/FieldEggCarry")
     if FEC and FEC:IsA("RemoteEvent") then
         FEC.OnClientEvent:Connect(function() TemOvo = true end)
     end
-    local FED = Networking:FindFirstChild("RE/EggWorld/FieldEggDrop")
+    local FED = net:FindFirstChild("RE/EggWorld/FieldEggDrop")
     if FED and FED:IsA("RemoteEvent") then
         FED.OnClientEvent:Connect(function() TemOvo = false end)
     end
@@ -431,7 +388,6 @@ local function CicloAutoSteal()
             StatusLabel.Text = "Ovo dropou! Pegando de novo..."
             StatusLabel.TextColor3 = Color3.fromRGB(240, 180, 60)
             task.wait(1.5)
-
             local tentativas = 0
             while AutoStealLigado and not TemOvo and tentativas < 30 do
                 PegarOvoProximidade()
@@ -452,7 +408,7 @@ local function CicloAutoSteal()
 end
 
 -- ============================================================
--- UI — CROKS HUB (azul)
+-- UI
 -- ============================================================
 local parent
 if gethui then local ok, h = pcall(gethui); if ok and h then parent = h end end
@@ -465,9 +421,9 @@ if not parent then parent = LP:WaitForChild("PlayerGui") end
 local C = {
     bg      = Color3.fromRGB(8, 10, 16),
     panel   = Color3.fromRGB(14, 17, 26),
-    accent  = Color3.fromRGB(60, 160, 255),
-    accent2 = Color3.fromRGB(80, 180, 255),
-    success = Color3.fromRGB(60, 160, 255),
+    accent  = Color3.fromRGB(120, 70, 240),
+    accent2 = Color3.fromRGB(70, 160, 255),
+    success = Color3.fromRGB(50, 230, 140),
     off     = Color3.fromRGB(45, 50, 65),
     off2    = Color3.fromRGB(30, 35, 50),
     text    = Color3.fromRGB(255, 255, 255),
@@ -494,11 +450,8 @@ BtnFloat.BorderSizePixel = 0
 BtnFloat.AutoButtonColor = false
 BtnFloat.Active = true
 Instance.new("UICorner", BtnFloat).CornerRadius = UDim.new(1,0)
-
 local FS = Instance.new("UIStroke", BtnFloat)
-FS.Color = C.accent2
-FS.Thickness = 2
-FS.Transparency = 0.3
+FS.Color = C.accent2; FS.Thickness = 2; FS.Transparency = 0.3
 
 local Main = Instance.new("Frame", SG)
 Main.Size = UDim2.new(0, 280, 0, 400)
@@ -508,10 +461,8 @@ Main.BorderSizePixel = 0
 Main.Active = true
 Main.Visible = false
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
-
 local MS = Instance.new("UIStroke", Main)
-MS.Color = C.border
-MS.Thickness = 1.5
+MS.Color = C.border; MS.Thickness = 1.5
 
 local Head = Instance.new("Frame", Main)
 Head.Size = UDim2.new(1, 0, 0, 52)
@@ -519,7 +470,6 @@ Head.BackgroundColor3 = C.panel
 Head.BorderSizePixel = 0
 Head.Active = true
 Instance.new("UICorner", Head).CornerRadius = UDim.new(0, 12)
-
 local HG = Instance.new("UIGradient", Head)
 HG.Color = ColorSequence.new(C.accent, C.accent2)
 
@@ -537,7 +487,7 @@ local Sub = Instance.new("TextLabel", Head)
 Sub.Size = UDim2.new(0,180,0,12)
 Sub.Position = UDim2.new(0,15,0,32)
 Sub.BackgroundTransparency = 1
-Sub.Text = "Auto Steal + Auto Bat"
+Sub.Text = "Auto Steal + Auto Bat + Bypass"
 Sub.TextColor3 = C.textDim
 Sub.Font = Enum.Font.GothamMedium
 Sub.TextSize = 9
@@ -569,7 +519,7 @@ BtnClose.BorderSizePixel = 0
 BtnClose.AutoButtonColor = false
 Instance.new("UICorner", BtnClose).CornerRadius = UDim.new(0,6)
 
--- Drag
+-- DRAG
 do
     local drag, ds, sp
     Head.InputBegan:Connect(function(i)
@@ -614,9 +564,7 @@ local function Botao(pai, y, txt, cor1, cor2, strokeCor)
     local g = Instance.new("UIGradient", b)
     g.Color = ColorSequence.new(cor1, cor2)
     local s = Instance.new("UIStroke", b)
-    s.Color = strokeCor
-    s.Thickness = 1
-    s.Transparency = 0.5
+    s.Color = strokeCor; s.Thickness = 1; s.Transparency = 0.5
     local tx = Instance.new("TextLabel", b)
     tx.Size = UDim2.new(1,0,1,0)
     tx.BackgroundTransparency = 1
@@ -629,11 +577,11 @@ local function Botao(pai, y, txt, cor1, cor2, strokeCor)
 end
 
 local BtnAuto, GAuto, SAuto, TAuto = Botao(Main, 62, "AUTO STEAL  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
-local BtnAT, GAT, SAT, TAT = Botao(Main, 112, "Anti-Trap  -  ON", C.success, C.accent2, Color3.fromRGB(120,200,255))
+local BtnAT, GAT, SAT, TAT = Botao(Main, 112, "Anti-Trap  -  ON", C.success, C.accent2, Color3.fromRGB(120,255,170))
 local BtnBypass, GBypass, SBypass, TBypass = Botao(Main, 162, "Bypass  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
-local BtnRag, GRag, SRag, TRag = Botao(Main, 212, "Anti-Ragdoll  -  ON", C.success, C.accent2, Color3.fromRGB(120,200,255))
-local BtnAntiHit, GAH, SAH, TAH = Botao(Main, 262, "Anti-Hit  -  ON", C.success, C.accent2, Color3.fromRGB(120,200,255))
-local BtnAutoBat, GAB, SAB, TAB = Botao(Main, 312, "AUTO BAT  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
+local BtnRag, GRag, SRag, TRag = Botao(Main, 212, "Anti-Ragdoll  -  ON", C.success, C.accent2, Color3.fromRGB(120,255,170))
+local BtnAutoBat, GAB, SAB, TAB = Botao(Main, 262, "AUTO BAT  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
+local BtnLog, GLog, SLog, TLog = Botao(Main, 312, "📋 COPIAR LOG", C.accent, C.accent2, Color3.fromRGB(180,130,255))
 
 local StatusLabel = Instance.new("TextLabel", Main)
 StatusLabel.Size = UDim2.new(1,-20,0,32)
@@ -646,38 +594,27 @@ StatusLabel.TextSize = 10
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 StatusLabel.TextWrapped = true
 
--- ============================================================
 -- TOGGLES
--- ============================================================
 local function ToggleAuto()
     AutoStealLigado = not AutoStealLigado
     if AutoStealLigado then
         TAuto.Text = "AUTO STEAL  -  ON"
         BtnAuto.BackgroundColor3 = C.success
         GAuto.Color = ColorSequence.new(C.success, C.accent2)
-        StatusLabel.Text = "Auto Steal ON — TP pra Forest"
-        StatusLabel.TextColor3 = C.success
         CicloAutoSteal()
     else
         TAuto.Text = "AUTO STEAL  -  OFF"
         BtnAuto.BackgroundColor3 = C.off
         GAuto.Color = ColorSequence.new(C.off, C.off2)
         StatusLabel.Text = "Auto Steal OFF"
-        StatusLabel.TextColor3 = C.textDim
     end
 end
 
 local function ToggleAntiTrap()
     AntiTrapAtivo = not AntiTrapAtivo
-    if AntiTrapAtivo then
-        TAT.Text = "Anti-Trap  -  ON"
-        BtnAT.BackgroundColor3 = C.success
-        GAT.Color = ColorSequence.new(C.success, C.accent2)
-    else
-        TAT.Text = "Anti-Trap  -  OFF"
-        BtnAT.BackgroundColor3 = C.off
-        GAT.Color = ColorSequence.new(C.off, C.off2)
-    end
+    TAT.Text = AntiTrapAtivo and "Anti-Trap  -  ON" or "Anti-Trap  -  OFF"
+    BtnAT.BackgroundColor3 = AntiTrapAtivo and C.success or C.off
+    GAT.Color = AntiTrapAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
 end
 
 local function ToggleBypass()
@@ -697,43 +634,37 @@ end
 
 local function ToggleRag()
     AntiRagdollAtivo = not AntiRagdollAtivo
-    if AntiRagdollAtivo then
-        TRag.Text = "Anti-Ragdoll  -  ON"
-        BtnRag.BackgroundColor3 = C.success
-        GRag.Color = ColorSequence.new(C.success, C.accent2)
-    else
-        TRag.Text = "Anti-Ragdoll  -  OFF"
-        BtnRag.BackgroundColor3 = C.off
-        GRag.Color = ColorSequence.new(C.off, C.off2)
-    end
-end
-
-local function ToggleAntiHit()
-    AntiHitAtivo = not AntiHitAtivo
-    if AntiHitAtivo then
-        local hum = Bypass.Fake or (LP.Character and LP.Character:FindFirstChildOfClass("Humanoid"))
-        blindarHealth(hum)
-        TAH.Text = "Anti-Hit  -  ON"
-        BtnAntiHit.BackgroundColor3 = C.success
-        GAH.Color = ColorSequence.new(C.success, C.accent2)
-    else
-        if hitConn then pcall(function() hitConn:Disconnect() end); hitConn = nil end
-        TAH.Text = "Anti-Hit  -  OFF"
-        BtnAntiHit.BackgroundColor3 = C.off
-        GAH.Color = ColorSequence.new(C.off, C.off2)
-    end
+    TRag.Text = AntiRagdollAtivo and "Anti-Ragdoll  -  ON" or "Anti-Ragdoll  -  OFF"
+    BtnRag.BackgroundColor3 = AntiRagdollAtivo and C.success or C.off
+    GRag.Color = AntiRagdollAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
 end
 
 local function ToggleAutoBat()
     AutoBatAtivo = not AutoBatAtivo
-    if AutoBatAtivo then
-        TAB.Text = "AUTO BAT  -  ON"
-        BtnAutoBat.BackgroundColor3 = C.success
-        GAB.Color = ColorSequence.new(C.success, C.accent2)
+    TAB.Text = AutoBatAtivo and "AUTO BAT  -  ON" or "AUTO BAT  -  OFF"
+    BtnAutoBat.BackgroundColor3 = AutoBatAtivo and C.success or C.off
+    GAB.Color = AutoBatAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
+end
+
+local function CopiarLog()
+    local texto = table.concat(LOG, "\n")
+    local ok = false
+    if setclipboard then ok = pcall(setclipboard, texto)
+    elseif toclipboard then ok = pcall(toclipboard, texto) end
+    if ok then
+        TLog.Text = "✓ COPIADO!"
+        BtnLog.BackgroundColor3 = C.success
+        task.delay(1.5, function()
+            TLog.Text = "📋 COPIAR LOG"
+            BtnLog.BackgroundColor3 = C.accent
+        end)
     else
-        TAB.Text = "AUTO BAT  -  OFF"
-        BtnAutoBat.BackgroundColor3 = C.off
-        GAB.Color = ColorSequence.new(C.off, C.off2)
+        TLog.Text = "✗ FALHOU"
+        BtnLog.BackgroundColor3 = Color3.fromRGB(240, 80, 80)
+        task.delay(1.5, function()
+            TLog.Text = "📋 COPIAR LOG"
+            BtnLog.BackgroundColor3 = C.accent
+        end)
     end
 end
 
@@ -741,22 +672,11 @@ BtnAuto.MouseButton1Click:Connect(ToggleAuto)
 BtnAT.MouseButton1Click:Connect(ToggleAntiTrap)
 BtnBypass.MouseButton1Click:Connect(ToggleBypass)
 BtnRag.MouseButton1Click:Connect(ToggleRag)
-BtnAntiHit.MouseButton1Click:Connect(ToggleAntiHit)
 BtnAutoBat.MouseButton1Click:Connect(ToggleAutoBat)
+BtnLog.MouseButton1Click:Connect(CopiarLog)
 
--- Reaplica no respawn
-LP.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
-    if AntiHitAtivo then
-        blindarHealth(char:FindFirstChildOfClass("Humanoid"))
-    end
-end)
-
--- ============================================================
--- ABRIR / FECHAR
--- ============================================================
+-- ABRIR/FECHAR
 local aberto = false
-
 local function abrir()
     if aberto then return end
     aberto = true
@@ -814,4 +734,4 @@ end)
 task.wait(0.5)
 abrir()
 
-print("[Croks Hub v31] Carregado — UI azul + Auto Bat")
+print("[Croks Hub v32] Carregado — Auto Steal + Auto Bat + Bypass")
