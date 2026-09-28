@@ -1,6 +1,6 @@
 -- ============================================================
--- CROKS HUB — v32
--- Auto Steal (Lennon) + Bypass (Lennon) + Auto Bat + Anti-Trap + Anti-Ragdoll
+-- CROKS HUB — v33
+-- Auto Steal (melhor ovo) + Bypass Lennon + Auto Bat + Anti-Trap
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -16,11 +16,26 @@ local LP      = Players.LocalPlayer
 -- CONFIG
 -- ============================================================
 local CONFIG = {
-    FOREST_POS    = Vector3.new(596, 68, -328),
-    SAFEZONE_POS  = Vector3.new(456, 67, -364),
-    ESPERA_KNOCK  = 60,
-    BAT_RANGE     = 12,
-    BAT_CD        = 0.25,
+    SAFEZONE_POS = Vector3.new(545.2, 70.6, -368.6),
+    BAT_RANGE    = 12,
+    BAT_CD       = 0.25,
+    TP_OFFSET    = 3,
+    ESPERA_KNOCK = 60,
+}
+
+local AREAS = {
+    {nome="Forest",         pos=Vector3.new(596.0, 68.0, -328.0)},
+    {nome="Lake",           pos=Vector3.new(744.0, 68.5, -408.0)},
+    {nome="Desert",         pos=Vector3.new(948.0, 69.5, -323.0)},
+    {nome="Jungle",         pos=Vector3.new(1188.0, 68.5, -408.0)},
+    {nome="Snow",           pos=Vector3.new(1492.0, 69.0, -315.0)},
+    {nome="Volcano",        pos=Vector3.new(1882.0, 68.0, -398.0)},
+    {nome="Abyss Ocean",    pos=Vector3.new(2280.0, 68.0, -326.0)},
+    {nome="Prehistoric",    pos=Vector3.new(2812.0, 69.0, -398.0)},
+    {nome="Cosmic",         pos=Vector3.new(3390.0, 68.0, -324.0)},
+    {nome="Cherry Blossom", pos=Vector3.new(4028.0, 68.5, -396.0)},
+    {nome="Titan Temple",   pos=Vector3.new(4796.0, 69.5, -328.0)},
+    {nome="Light Dark",     pos=Vector3.new(5660.0, 70.0, -331.0)},
 }
 
 -- ============================================================
@@ -35,7 +50,7 @@ local function addLog(msg)
 end
 
 -- ============================================================
--- BYPASS (Desync Lennon)
+-- BYPASS (Desync Lennon — sempre ON)
 -- ============================================================
 local Bypass = {
     Enabled = true, InProgress = false, Active = false,
@@ -125,17 +140,17 @@ function Bypass.Remove()
         real.Parent = char
         local s = Bypass.OriginalState or {}
         pcall(function()
-            real.Archivable         = s.Archivable
+            real.Archivable = s.Archivable
             real.BreakJointsOnDeath = s.BreakJointsOnDeath
-            real.WalkSpeed          = s.WalkSpeed or real.WalkSpeed
-            real.JumpPower          = s.JumpPower or real.JumpPower
-            real.JumpHeight         = s.JumpHeight or real.JumpHeight
-            real.UseJumpPower       = s.UseJumpPower
-            real.HipHeight          = s.HipHeight or real.HipHeight
-            real.PlatformStand      = false
-            real.AutoRotate         = true
-            real.Sit                = false
-            real.Health             = math.min(s.Health or real.MaxHealth, real.MaxHealth)
+            real.WalkSpeed = s.WalkSpeed or real.WalkSpeed
+            real.JumpPower = s.JumpPower or real.JumpPower
+            real.JumpHeight = s.JumpHeight or real.JumpHeight
+            real.UseJumpPower = s.UseJumpPower
+            real.HipHeight = s.HipHeight or real.HipHeight
+            real.PlatformStand = false
+            real.AutoRotate = true
+            real.Sit = false
+            real.Health = math.min(s.Health or real.MaxHealth, real.MaxHealth)
             real:ChangeState(Enum.HumanoidStateType.GettingUp)
         end)
         pcall(function()
@@ -219,6 +234,7 @@ CS:GetInstanceAddedSignal("PlacedTrap"):Connect(function(trap)
         end)
     end
 end)
+
 -- ============================================================
 -- AUTO BAT
 -- ============================================================
@@ -285,10 +301,11 @@ end)
 local net = RS:FindFirstChild("Packages")
 net = net and net:FindFirstChild("Networking")
 
-local Carry, Drop
+local Carry, Drop, Snapshot
 if net then
-    Carry = net:FindFirstChild("RF/EggWorld/AskFieldEggCarry")
-    Drop  = net:FindFirstChild("RF/EggWorld/AskFieldEggDrop")
+    Carry    = net:FindFirstChild("RF/EggWorld/AskFieldEggCarry")
+    Drop     = net:FindFirstChild("RF/EggWorld/AskFieldEggDrop")
+    Snapshot = net:FindFirstChild("RF/EggWorld/AskFieldEggSnapshot")
 end
 
 -- ============================================================
@@ -308,42 +325,99 @@ local function TeleportarPara(destino)
 end
 
 -- ============================================================
--- PEGAR OVO
+-- PEGAR OVO (por Uid)
 -- ============================================================
-local function PegarOvoProximidade()
-    if not fireproximityprompt then return false end
-    local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    local melhor, menor = nil, math.huge
-    for _, o in ipairs(workspace:GetDescendants()) do
-        if o:IsA("ProximityPrompt") then
-            local p = o.Parent
-            if p and p:IsA("BasePart") then
-                local d = (p.Position - hrp.Position).Magnitude
-                if d < 50 and d < menor then menor = d; melhor = o end
-            end
-        end
-    end
-    if melhor then pcall(function() fireproximityprompt(melhor, 0) end); return true end
-    return false
+local function PegarOvoPorUid(uid)
+    if not Carry or not uid then return false end
+    local ok, r = pcall(function() return Carry:InvokeServer({Uid = uid}) end)
+    return ok and r == true
+end
+
+local function SoltarOvo()
+    if not Drop then return false end
+    local ok = pcall(function() Drop:InvokeServer({Reason = "PlayerRequest"}) end)
+    return ok
 end
 
 -- ============================================================
--- CICLO AUTO STEAL
+-- LISTAR OVOS (Snapshot)
+-- ============================================================
+local function ListarOvos()
+    if not Snapshot then return {} end
+    local ok, r = pcall(function() return Snapshot:InvokeServer() end)
+    if not ok or not r or not r.Records then return {} end
+    local ovos = {}
+    for _, rec in ipairs(r.Records) do
+        if rec.State == "Slot" or rec.State == "Dropped" then
+            local pos = rec.BottomCFrame and rec.BottomCFrame.Position
+            if pos then
+                table.insert(ovos, {
+                    Uid = rec.Uid,
+                    Category = rec.AssetCategory,
+                    Area = rec.AreaId,
+                    Scale = rec.AssetScale,
+                    Pos = pos,
+                    Value = (rec.AssetScale or 1),
+                })
+            end
+        end
+    end
+    table.sort(ovos, function(a, b) return a.Value > b.Value end)
+    return ovos
+end
+
+-- ============================================================
+-- ACHAR GUARDIÃO DA ÁREA
+-- ============================================================
+local function AcharGuardiao(areaNome)
+    local world = workspace:FindFirstChild("World")
+    if not world then return nil end
+    local areas = world:FindFirstChild("Areas")
+    if not areas then return nil end
+    local ga = areas:FindFirstChild("GuardAreas")
+    if not ga then return nil end
+    local area = ga:FindFirstChild(areaNome)
+    if not area then return nil end
+    return area:FindFirstChild("Guard")
+end
+
+local function GuardState(guard)
+    if not guard then return "nil" end
+    return guard:GetAttribute("GuardState") or "nil"
+end
+
+addLog("[INIT] Base carregada")
+-- ============================================================
+-- AUTO STEAL — Melhor ovo → galinha → SafeZone
 -- ============================================================
 local AutoStealLigado = false
 local CicloAndando = false
 local TemOvo = false
+local UidAtual = nil
 
 if net then
     local FEC = net:FindFirstChild("RE/EggWorld/FieldEggCarry")
     if FEC and FEC:IsA("RemoteEvent") then
-        FEC.OnClientEvent:Connect(function() TemOvo = true end)
+        FEC.OnClientEvent:Connect(function(dados)
+            TemOvo = true
+            if type(dados) == "table" and dados.Uid then
+                UidAtual = dados.Uid
+            end
+        end)
     end
     local FED = net:FindFirstChild("RE/EggWorld/FieldEggDrop")
     if FED and FED:IsA("RemoteEvent") then
-        FED.OnClientEvent:Connect(function() TemOvo = false end)
+        FED.OnClientEvent:Connect(function()
+            TemOvo = false
+            UidAtual = nil
+        end)
     end
+end
+
+local function PegarMelhorOvo()
+    local ovos = ListarOvos()
+    if #ovos == 0 then return nil end
+    return ovos[1]
 end
 
 local function CicloAutoSteal()
@@ -352,57 +426,71 @@ local function CicloAutoSteal()
     CicloAndando = true
 
     task.spawn(function()
+        addLog("[CICLO] Iniciando...")
         Bypass.Reativar()
         Bypass.Apply(LP.Character)
-        task.wait(0.4)
+        task.wait(0.5)
 
-        StatusLabel.Text = "TP pra Forest..."
-        StatusLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
-        TeleportarPara(CONFIG.FOREST_POS)
+        while AutoStealLigado do
+            -- 1. Lista ovos, pega o melhor
+            local melhor = PegarMelhorOvo()
+            if not melhor then
+                StatusLabel.Text = "Nenhum ovo — esperando mapa"
+                StatusLabel.TextColor3 = Color3.fromRGB(240, 180, 60)
+                addLog("[CICLO] Sem ovos, esperando 5s")
+                task.wait(5)
+                continue
+            end
 
-        StatusLabel.Text = "Na Forest — pega o ovo"
-        StatusLabel.TextColor3 = Color3.fromRGB(240, 180, 60)
+            addLog("[CICLO] Melhor: " .. tostring(melhor.Category) .. " | " .. tostring(melhor.Area))
 
-        local t0 = tick()
-        while AutoStealLigado and (tick() - t0) < 90 do
-            if TemOvo then break end
-            task.wait(0.1)
-        end
+            -- 2. TP até o melhor ovo
+            StatusLabel.Text = "TP pro melhor ovo..."
+            StatusLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
+            TeleportarPara(melhor.Pos)
+            task.wait(0.5)
 
-        if not TemOvo then
-            StatusLabel.Text = "Sem ovo detectado"
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            CicloAndando = false
-            return
-        end
-
-        StatusLabel.Text = "Ovo pego! Esperando guardião..."
-        StatusLabel.TextColor3 = Color3.fromRGB(50, 230, 140)
-
-        local tKnock = tick()
-        while AutoStealLigado and TemOvo and (tick() - tKnock) < CONFIG.ESPERA_KNOCK do
-            task.wait(0.1)
-        end
-
-        if not TemOvo then
-            StatusLabel.Text = "Ovo dropou! Pegando de novo..."
+            -- 3. Pega o ovo
+            StatusLabel.Text = "Pegando ovo..."
             StatusLabel.TextColor3 = Color3.fromRGB(240, 180, 60)
-            task.wait(1.5)
-            local tentativas = 0
-            while AutoStealLigado and not TemOvo and tentativas < 30 do
-                PegarOvoProximidade()
+            local pegou = PegarOvoPorUid(melhor.Uid)
+            addLog("[CICLO] Pegar: " .. tostring(pegou))
+
+            if pegou then
+                -- 4. Espera guardião bater (ovo dropa)
+                StatusLabel.Text = "Ovo pego! Esperando guardião..."
+                StatusLabel.TextColor3 = Color3.fromRGB(50, 230, 140)
+
+                local t0 = tick()
+                while AutoStealLigado and TemOvo and (tick() - t0) < CONFIG.ESPERA_KNOCK do
+                    task.wait(0.1)
+                end
+
+                if TemOvo then
+                    addLog("[CICLO] Guard não bateu (timeout)")
+                else
+                    addLog("[CICLO] Ovo dropou!")
+                end
+
+                -- 5. TP pra SafeZone
+                StatusLabel.Text = "TP pra SafeZone..."
+                StatusLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
                 task.wait(0.3)
-                tentativas = tentativas + 1
+                TeleportarPara(CONFIG.SAFEZONE_POS)
+                task.wait(1)
+
+                -- 6. Entrega (dropa)
+                SoltarOvo()
+                addLog("[CICLO] Entregou na SafeZone")
+                task.wait(1)
+            else
+                addLog("[CICLO] Falha ao pegar — próximo")
+                task.wait(1)
             end
         end
 
-        StatusLabel.Text = "TP pra SafeZone..."
-        StatusLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
-        task.wait(0.3)
-        TeleportarPara(CONFIG.SAFEZONE_POS)
-
-        StatusLabel.Text = "Ciclo completo (bypass ON)"
-        StatusLabel.TextColor3 = Color3.fromRGB(50, 230, 140)
+        StatusLabel.Text = "Ciclo parado"
+        StatusLabel.TextColor3 = C.textDim
         CicloAndando = false
     end)
 end
@@ -454,8 +542,8 @@ local FS = Instance.new("UIStroke", BtnFloat)
 FS.Color = C.accent2; FS.Thickness = 2; FS.Transparency = 0.3
 
 local Main = Instance.new("Frame", SG)
-Main.Size = UDim2.new(0, 280, 0, 400)
-Main.Position = UDim2.new(0.5, -140, 0.5, -200)
+Main.Size = UDim2.new(0, 280, 0, 360)
+Main.Position = UDim2.new(0.5, -140, 0.5, -180)
 Main.BackgroundColor3 = C.bg
 Main.BorderSizePixel = 0
 Main.Active = true
@@ -487,7 +575,7 @@ local Sub = Instance.new("TextLabel", Head)
 Sub.Size = UDim2.new(0,180,0,12)
 Sub.Position = UDim2.new(0,15,0,32)
 Sub.BackgroundTransparency = 1
-Sub.Text = "Auto Steal + Auto Bat + Bypass"
+Sub.Text = "Auto Steal (melhor ovo) + Auto Bat"
 Sub.TextColor3 = C.textDim
 Sub.Font = Enum.Font.GothamMedium
 Sub.TextSize = 9
@@ -519,7 +607,6 @@ BtnClose.BorderSizePixel = 0
 BtnClose.AutoButtonColor = false
 Instance.new("UICorner", BtnClose).CornerRadius = UDim.new(0,6)
 
--- DRAG
 do
     local drag, ds, sp
     Head.InputBegan:Connect(function(i)
@@ -578,14 +665,13 @@ end
 
 local BtnAuto, GAuto, SAuto, TAuto = Botao(Main, 62, "AUTO STEAL  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
 local BtnAT, GAT, SAT, TAT = Botao(Main, 112, "Anti-Trap  -  ON", C.success, C.accent2, Color3.fromRGB(120,255,170))
-local BtnBypass, GBypass, SBypass, TBypass = Botao(Main, 162, "Bypass  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
+local BtnAutoBat, GAB, SAB, TAB = Botao(Main, 162, "AUTO BAT  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
 local BtnRag, GRag, SRag, TRag = Botao(Main, 212, "Anti-Ragdoll  -  ON", C.success, C.accent2, Color3.fromRGB(120,255,170))
-local BtnAutoBat, GAB, SAB, TAB = Botao(Main, 262, "AUTO BAT  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
-local BtnLog, GLog, SLog, TLog = Botao(Main, 312, "📋 COPIAR LOG", C.accent, C.accent2, Color3.fromRGB(180,130,255))
+local BtnLog, GLog, SLog, TLog = Botao(Main, 262, "📋 COPIAR LOG", C.accent, C.accent2, Color3.fromRGB(180,130,255))
 
 local StatusLabel = Instance.new("TextLabel", Main)
 StatusLabel.Size = UDim2.new(1,-20,0,32)
-StatusLabel.Position = UDim2.new(0,10,0,362)
+StatusLabel.Position = UDim2.new(0,10,0,312)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Text = "Pronto"
 StatusLabel.TextColor3 = C.textDim
@@ -617,19 +703,11 @@ local function ToggleAntiTrap()
     GAT.Color = AntiTrapAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
 end
 
-local function ToggleBypass()
-    if Bypass.IsActive() then
-        Bypass.Remove()
-        TBypass.Text = "Bypass  -  OFF"
-        BtnBypass.BackgroundColor3 = C.off
-        GBypass.Color = ColorSequence.new(C.off, C.off2)
-    else
-        Bypass.Reativar()
-        Bypass.Apply(LP.Character)
-        TBypass.Text = "Bypass  -  ON"
-        BtnBypass.BackgroundColor3 = C.success
-        GBypass.Color = ColorSequence.new(C.success, C.accent2)
-    end
+local function ToggleAutoBat()
+    AutoBatAtivo = not AutoBatAtivo
+    TAB.Text = AutoBatAtivo and "AUTO BAT  -  ON" or "AUTO BAT  -  OFF"
+    BtnAutoBat.BackgroundColor3 = AutoBatAtivo and C.success or C.off
+    GAB.Color = AutoBatAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
 end
 
 local function ToggleRag()
@@ -637,13 +715,6 @@ local function ToggleRag()
     TRag.Text = AntiRagdollAtivo and "Anti-Ragdoll  -  ON" or "Anti-Ragdoll  -  OFF"
     BtnRag.BackgroundColor3 = AntiRagdollAtivo and C.success or C.off
     GRag.Color = AntiRagdollAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
-end
-
-local function ToggleAutoBat()
-    AutoBatAtivo = not AutoBatAtivo
-    TAB.Text = AutoBatAtivo and "AUTO BAT  -  ON" or "AUTO BAT  -  OFF"
-    BtnAutoBat.BackgroundColor3 = AutoBatAtivo and C.success or C.off
-    GAB.Color = AutoBatAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
 end
 
 local function CopiarLog()
@@ -670,9 +741,8 @@ end
 
 BtnAuto.MouseButton1Click:Connect(ToggleAuto)
 BtnAT.MouseButton1Click:Connect(ToggleAntiTrap)
-BtnBypass.MouseButton1Click:Connect(ToggleBypass)
-BtnRag.MouseButton1Click:Connect(ToggleRag)
 BtnAutoBat.MouseButton1Click:Connect(ToggleAutoBat)
+BtnRag.MouseButton1Click:Connect(ToggleRag)
 BtnLog.MouseButton1Click:Connect(CopiarLog)
 
 -- ABRIR/FECHAR
@@ -685,8 +755,8 @@ local function abrir()
     Main.Size = UDim2.new(0,0,0,0)
     Main.Position = UDim2.new(0.5,0,0.5,0)
     TS:Create(Main, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0,280,0,400),
-        Position = UDim2.new(0.5,-140,0.5,-200)
+        Size = UDim2.new(0,280,0,360),
+        Position = UDim2.new(0.5,-140,0.5,-180)
     }):Play()
 end
 
@@ -731,7 +801,11 @@ UIS.InputEnded:Connect(function(i)
     end
 end)
 
+-- Bypass sempre ON
+Bypass.Reativar()
+Bypass.Apply(LP.Character)
+
 task.wait(0.5)
 abrir()
 
-print("[Croks Hub v32] Carregado — Auto Steal + Auto Bat + Bypass")
+print("[Croks Hub v33] Carregado — Auto Steal melhor ovo + Bypass ON")
