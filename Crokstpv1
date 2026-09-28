@@ -2891,3 +2891,2323 @@ for _, v16 in ipairs(tbl5) do
 end
 
 tbl2.updateRarityChecks()
+local beam = nil
+local attachment = nil
+local attachment2 = nil
+
+tbl2.clearBeam = function()
+	if beam then
+		beam:Destroy()
+		beam = nil
+	end
+
+	if attachment then
+		attachment:Destroy()
+		attachment = nil
+	end
+
+	if attachment2 then
+		if attachment2.Parent then
+			attachment2.Parent:Destroy()
+		end
+
+		attachment2 = nil
+	end
+end
+
+tbl2.createBeam = function(arg)
+	if not humanoidRootPart or not humanoidRootPart.Parent or not arg then
+		return
+	end
+	tbl2.clearBeam()
+	attachment = Instance.new("Attachment")
+	attachment.Name = "LennonBeamOrigin"
+	attachment.Parent = humanoidRootPart
+	local part = Instance.new("Part")
+	part.Name = "LennonBeamTarget"
+	part.Size = Vector3.new(0.1, 0.1, 0.1)
+	part.Transparency = 1
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = false
+	part.CFrame = CFrame.new(arg)
+	part.Parent = workspace
+	attachment2 = Instance.new("Attachment")
+	attachment2.Parent = part
+	beam = Instance.new("Beam")
+	beam.Name = "LennonTargetBeam"
+	beam.Attachment0 = attachment
+	beam.Attachment1 = attachment2
+	beam.Width0 = tbl3.BEAM_WIDTH
+	beam.Width1 = tbl3.BEAM_WIDTH
+	beam.FaceCamera = true
+	beam.LightEmission = 1
+	beam.LightInfluence = 0
+	beam.Color = ColorSequence.new(Color3.fromRGB(60, 160, 255))
+	beam.Parent = humanoidRootPart
+end
+
+tbl2.updateBestDisplay = function()
+	tbl2.refreshEggs()
+	local v16 = tbl2.getActiveTargetEgg()
+
+	pcall(function()
+		if not v16 then
+			if textLabel5 and textLabel5.Parent and textLabel5.Text ~= "NO EGG FOUND" then
+				textLabel5.Text = "NO EGG FOUND"
+			end
+
+			if textLabel6 and textLabel6.Parent and textLabel6.Text ~= "" then
+				textLabel6.Text = ""
+			end
+
+			if textLabel7 and textLabel7.Parent and textLabel7.Text ~= "--" then
+				textLabel7.Text = "--"
+			end
+
+			tbl2.updatePetPreview(nil)
+		else
+			local text = tostring(v16.Name or "UNKNOWN")
+			local text2 = tostring(v16.RarityName or "")
+			local v17 = tbl2.formatNumber(v16.Generation or 0)
+
+			if textLabel5 and textLabel5.Parent and textLabel5.Text ~= text then
+				textLabel5.Text = text
+			end
+
+			if textLabel6 and textLabel6.Parent then
+				if textLabel6.Text ~= text2 then
+					textLabel6.Text = text2
+				end
+
+				local rarityColor = v16.RarityColor or Color3.fromRGB(170, 190, 178)
+
+				if textLabel6.TextColor3 ~= rarityColor then
+					textLabel6.TextColor3 = rarityColor
+				end
+			end
+
+			if textLabel7 and textLabel7.Parent and textLabel7.Text ~= v17 then
+				textLabel7.Text = v17
+			end
+
+			tbl2.updatePetPreview(v16.Category)
+		end
+	end)
+
+	if tbl4.dropdownOpen then
+		tbl2.refreshDropdownRows()
+	end
+
+	return v16
+end
+
+tbl2.updateLoopUI = function()
+	if not tbl2.loopBox or not tbl2.loopBox.Parent then
+		return
+	end
+
+	if tbl4.loopEnabled then
+		tbl2.loopBox.BackgroundColor3 = Color3.fromRGB(60, 160, 255)
+		tbl2.loopBoxStroke.Color = Color3.fromRGB(90, 180, 255)
+		tbl2.loopCheck.Visible = true
+		tbl2.loopLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
+	else
+		tbl2.loopBox.BackgroundColor3 = Color3.fromRGB(25, 32, 27)
+		tbl2.loopBoxStroke.Color = Color3.fromRGB(90, 120, 98)
+		tbl2.loopCheck.Visible = false
+		tbl2.loopLabel.TextColor3 = Color3.fromRGB(145, 165, 150)
+	end
+end
+
+tbl2.updateToggle = function()
+	if tbl4.enabled then
+		TweenService:Create(frame9, TweenInfo.new(0.18, Enum.EasingStyle.Quart), { BackgroundColor3 = Color3.fromRGB(30, 130, 220) }):Play()
+		TweenService:Create(frame10, TweenInfo.new(0.18, Enum.EasingStyle.Quart), { Position = UDim2.new(1, -17, 0.5, -7), BackgroundColor3 = Color3.fromRGB(240, 250, 255) }):Play()
+		uiStroke6.Color = Color3.fromRGB(40, 130, 200)
+
+		if tbl4.waitingForDay then
+			textLabel9.Text = tbl2.isDaytime() and "WAITING FOR GATE" or "WAITING FOR DAY"
+		elseif tbl4.runLoop then
+			textLabel9.Text = "LOOP ACTIVE"
+		else
+			textLabel9.Text = "ONE SHOT IN PROGRESS"
+		end
+	else
+		TweenService:Create(frame9, TweenInfo.new(0.18, Enum.EasingStyle.Quart), { BackgroundColor3 = Color3.fromRGB(32, 42, 35) }):Play()
+		TweenService:Create(frame10, TweenInfo.new(0.18, Enum.EasingStyle.Quart), { Position = UDim2.new(0, 3, 0.5, -7), BackgroundColor3 = Color3.fromRGB(145, 155, 148) }):Play()
+		uiStroke6.Color = Color3.fromRGB(35, 70, 43)
+		textLabel9.Text = tbl4.loopEnabled and "LOOP READY" or "ONE SHOT"
+	end
+end
+
+tbl2.startEggProtection = function(heldEggUid)
+	if not heldEggUid then
+		return
+	end
+
+	if tbl4.isProtecting and tbl4.heldEggUid == heldEggUid then
+		return
+	end
+	tbl4.isProtecting = true
+	tbl4.heldEggUid = heldEggUid
+	tbl4.lastProtectTime = 0
+
+	task.spawn(function()
+		while tbl4.isProtecting and tbl4.heldEggUid == heldEggUid do
+			tbl4.lastProtectTime = tick()
+
+			local ok, result = pcall(function()
+				return tbl.AskFieldEggCarry:InvokeServer({ Uid = heldEggUid })
+			end)
+
+			if ok and result == true then
+				tbl4.carrying = true
+			end
+
+			task.wait(tbl3.PROTECT_INTERVAL)
+		end
+	end)
+end
+
+tbl2.resetCarryState = function()
+	tbl4.carrying = false
+	tbl4.carryLocked = false
+	tbl4.isProtecting = false
+	tbl4.heldEggUid = nil
+	tbl4.targetEgg = nil
+	tbl2.clearBeam()
+	tbl2.unequipAllTools()
+end
+
+tbl2.startDelivery = function()
+end
+
+tbl2.startSpammingCarry = function(heldEggUid)
+	if not heldEggUid or tbl4.isStealing then
+		return
+	end
+
+	if tbl4.carrying and tbl4.heldEggUid == heldEggUid then
+		return
+	end
+	tbl4.isStealing = true
+	tbl4.lastSpamTime = 0
+
+	task.spawn(function()
+		while true do
+			if tbl4.isStealing and not tbl4.carrying then
+				local now = tick()
+
+				if not (tbl3.SPAM_INTERVAL <= now - tbl4.lastSpamTime) then
+					RunService.Heartbeat:Wait()
+					continue
+				else
+					tbl4.lastSpamTime = now
+
+					local ok, result = pcall(function()
+						return tbl.AskFieldEggCarry:InvokeServer({ Uid = heldEggUid })
+					end)
+
+					if ok and result == true then
+						tbl4.isStealing = false
+						tbl4.carrying = true
+						tbl4.heldEggUid = heldEggUid
+
+						tbl4.carryLocked = true
+						tbl2.spawnBossForEgg(tbl4.targetEgg or tbl2.getActiveTargetEgg())
+
+						task.spawn(function()
+							tbl2.startEggProtection(heldEggUid)
+						end)
+
+						task.spawn(function()
+							local v16 = tbl2.getGroundPosition()
+							local v17 = tbl2.getBossDeliveryPosition(v16)
+
+							if v16 and v17 then
+								tbl4.isDelivering = true
+								tbl2.clearBeam()
+								tbl2.createBeam(v16)
+
+								tbl2.startMove(v17, function()
+									tbl4.isDelivering = false
+									tbl2.cleanupBossMount()
+									tbl2.resetCarryState()
+									tbl2.completeGuidedCycle()
+								end, true)
+							end
+						end)
+
+						break
+					else
+						RunService.Heartbeat:Wait()
+						continue
+					end
+				end
+			end
+
+			break
+		end
+
+		tbl4.isStealing = false
+	end)
+end
+
+tbl2.completeGuidedCycle = function()
+	if not tbl4.guidedCycleActive then
+		return
+	end
+	tbl4.guidedCycleActive = false
+	tbl4.lastRefresh = 0
+	if tbl4.mode ~= "TELEGUIADO" then
+		return
+	end
+
+	if tbl4.enabled and tbl4.runLoop then
+		tbl2.updateToggle()
+		return
+	end
+	tbl4.enabled = false
+	tbl4.waitingForDay = false
+	tbl4.runLoop = false
+	tbl2.updateToggle()
+end
+tbl2.moveToBestEggTP = function()
+	if tbl4.carrying or tbl4.carryLocked or tbl4.isProtecting or tbl4.isDelivering or tbl4.isMoving or tbl4.isStealing then
+		return false
+	end
+	tbl2.refreshEggs(true)
+	local v16 = tbl2.getActiveTargetEgg()
+	if not v16 or not humanoidRootPart or not humanoidRootPart.Parent then
+		return false
+	end
+
+	if tbl4.mode == "TELEGUIADO" then
+		tbl4.guidedCycleActive = true
+
+		if tbl4.enabled then
+			tbl2.updateToggle()
+		end
+	end
+
+	tbl4.targetEgg = v16
+	local position = v16.Position
+	tbl2.createBeam(position)
+	if (position - humanoidRootPart.Position).Magnitude <= tbl3.SPAWN_OFFSET then
+		tbl2.startSpammingCarry(v16.Uid)
+		return
+	end
+
+	tbl2.startMove(position - (position - humanoidRootPart.Position).Unit * tbl3.SPAWN_OFFSET, function()
+		if tbl4.enabled and not tbl4.carrying and not tbl4.carryLocked and not tbl4.isProtecting and not tbl4.isDelivering and tbl4.targetEgg and tbl4.targetEgg.Uid == v16.Uid then
+			tbl2.startSpammingCarry(v16.Uid)
+		end
+	end)
+
+	return true
+end
+
+tbl2.cancelEverything = function()
+	tbl2.cleanupBossMount()
+	tbl2.stopCurrentTween(true)
+	tbl2.restoreOriginalHumanoid()
+	tbl4.isMoving = false
+	tbl4.moveTarget = nil
+	tbl4.onArrive = nil
+	tbl4.isStealing = false
+	tbl4.isProtecting = false
+	tbl4.isDelivering = false
+	tbl4.targetEgg = nil
+	tbl4.heldEggUid = nil
+	tbl4.carrying = false
+	tbl4.carryLocked = false
+	tbl4.guidedCycleActive = false
+	tbl2.clearBeam()
+end
+
+tbl2.setupCharacter = function(arg)
+	if tbl2.motorAddedConn then
+		tbl2.motorAddedConn:Disconnect()
+		tbl2.motorAddedConn = nil
+	end
+
+	if tbl2.motorRemovingConn then
+		tbl2.motorRemovingConn:Disconnect()
+		tbl2.motorRemovingConn = nil
+	end
+
+	v = arg
+	humanoidRootPart = arg:WaitForChild("HumanoidRootPart")
+	humanoid = arg:FindFirstChildOfClass("Humanoid")
+	tbl2.motorCache = {}
+
+	tbl2.walk(arg, function(arg2)
+		if arg2:IsA("Motor6D") then
+			tbl2.motorCache[#tbl2.motorCache + 1] = arg2
+		end
+	end)
+
+	tbl2.motorAddedConn = arg.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("Motor6D") then
+			table.insert(tbl2.motorCache, descendant)
+		end
+	end)
+
+	tbl2.motorRemovingConn = arg.DescendantRemoving:Connect(function(descendant)
+		if not descendant:IsA("Motor6D") then
+			return
+		end
+
+		for i = #tbl2.motorCache, 1, -1 do
+			if tbl2.motorCache[i] == descendant then
+				table.remove(tbl2.motorCache, i)
+				break
+			end
+		end
+	end)
+end
+
+tbl.FieldEggCarry.OnClientEvent:Connect(function(arg)
+	if tbl2.newTGRuntime and tbl2.newTGRuntime.running then
+		return
+	end
+
+	if not arg or not arg.Uid then
+		return
+	end
+	local uid = arg.Uid
+
+	if arg.CarrierUserId == localPlayer.UserId then
+		if uid == tbl4.heldEggUid then
+			tbl4.carrying = true
+			return
+		end
+
+		if tbl4.targetEgg and uid == tbl4.targetEgg.Uid then
+			tbl4.carrying = true
+			tbl4.heldEggUid = uid
+			tbl4.carryLocked = true
+			tbl4.isStealing = false
+			tbl2.spawnBossForEgg(tbl4.targetEgg or tbl2.getActiveTargetEgg())
+
+			task.spawn(function()
+				tbl2.startEggProtection(uid)
+			end)
+
+			task.spawn(function()
+				tbl2.startDelivery()
+			end)
+		end
+
+		return
+	end
+
+	if uid == tbl4.heldEggUid then
+		tbl4.carrying = false
+		tbl4.carryLocked = false
+
+		if not tbl4.isProtecting then
+			task.spawn(function()
+				tbl2.startEggProtection(uid)
+			end)
+		end
+
+		return
+	end
+
+	if tbl4.targetEgg and uid == tbl4.targetEgg.Uid then
+		tbl4.carrying = false
+
+		if not tbl4.isStealing then
+			task.defer(function()
+				task.wait(0.02)
+
+				if tbl4.targetEgg and tbl4.targetEgg.Uid == uid and not tbl4.carrying then
+					tbl2.startSpammingCarry(uid)
+				end
+			end)
+		end
+	end
+end)
+
+tbl2.newTGRuntime = tbl2.newTGRuntime or {
+	running = false,
+	cleanup = nil,
+	cooldownUntil = 0,
+	desyncOriginal = nil,
+	desyncOriginalState = nil,
+	desyncFake = nil,
+	desyncCharacter = nil,
+	desyncStateConn = nil,
+	desyncDescConn = nil,
+	restoreDesync = nil,
+}
+
+tbl2.stopNewTeleguiado = function()
+	local newTGRuntime = tbl2.newTGRuntime
+	local cleanup = newTGRuntime.cleanup
+	newTGRuntime.cleanup = nil
+
+	if cleanup then
+		pcall(cleanup)
+	end
+
+	local restoreDesync = newTGRuntime.restoreDesync
+
+	if restoreDesync then
+		pcall(restoreDesync)
+	end
+
+	newTGRuntime.running = false
+end
+
+tbl2.AUTO_STEAL_WAYPOINTS = {
+	{ name = "WP1", pos = Vector3.new(3340.17, 70.52, -331.08), speed = 4000 },
+	{ name = "WP2", pos = Vector3.new(2894.71, 75.64, -327.45), speed = 4000 },
+	{ name = "WP3", pos = Vector3.new(1923.22, 75.64, -330.11), speed = 4000 },
+	{ name = "WP4", pos = Vector3.new(767.54, 70.51, -327.81), speed = 4000 },
+	{ name = "WP5", pos = Vector3.new(596.65, 70.52, -316.80), speed = 1000 },
+	{ name = "WP6", pos = Vector3.new(573.61, 70.52, -327.54), speed = 1000 },
+	{ name = "WP7", pos = Vector3.new(540.18, 70.52, -356.74), speed = 1000 },
+}
+tbl2.AUTO_STEAL_RESET_WP_INDEX = 5
+tbl2.AUTO_STEAL_SPEED_EGG = 150
+tbl2.AUTO_STEAL_SPEED_TWEEN_FAST = 4000
+tbl2.AUTO_STEAL_SPEED_TWEEN_SLOW = 1000
+tbl2.AUTO_STEAL_SPEED_EGG_TWEEN = 100
+
+tbl2.autoStealDestroyHumanoid = function()
+	local character = localPlayer.Character
+	if not character then
+		return
+	end
+	local hum = character:FindFirstChildOfClass("Humanoid")
+	if hum then
+		pcall(function()
+			hum:Destroy()
+		end)
+	end
+	local anim = character:FindFirstChild("Animate")
+	if anim then
+		pcall(function()
+			anim:Destroy()
+		end)
+	end
+end
+
+tbl2.autoStealForceReset = function()
+	local character = localPlayer.Character
+	if not character then
+		return
+	end
+	local hum = character:FindFirstChildOfClass("Humanoid")
+	if not hum then
+		hum = Instance.new("Humanoid")
+		hum.Parent = character
+	end
+	pcall(function()
+		hum.Health = 0
+	end)
+end
+local function fn4()
+	local v19 = character
+	local humanoid2
+
+	if character then
+		humanoid2 = character:FindFirstChildOfClass("Humanoid")
+	else
+		humanoid2 = v19
+	end
+
+	if not humanoid2 then
+		return
+	end
+	humanoid2.Sit = false
+	humanoid2.PlatformStand = false
+
+	pcall(function()
+		humanoid2:Move(Vector3.zero, false)
+	end)
+
+	if v17 and v17.IsPlaying then
+		return
+	end
+	fn2()
+	local v20 = fn3(humanoid2)
+	if not v20 then
+		return
+	end
+	local animator = humanoid2:FindFirstChildOfClass("Animator")
+
+	if not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = humanoid2
+	end
+
+	for _, v21 in ipairs(animator:GetPlayingAnimationTracks()) do
+		if v21.Priority == Enum.AnimationPriority.Movement then
+			pcall(function()
+				v21:Stop(0.08)
+			end)
+		end
+	end
+
+	local animation2 = Instance.new("Animation")
+	animation2.Name = "LennonTweenOwnIdle"
+	animation2.AnimationId = v20
+
+	local ok, result = pcall(function()
+		return animator:LoadAnimation(animation2)
+	end)
+
+	if not ok or not result then
+		animation2:Destroy()
+		return
+	end
+	result.Looped = true
+	result.Priority = Enum.AnimationPriority.Movement
+	result:Play(0.12, 1, 1)
+	v18 = animation2
+	v17 = result
+end
+
+local v19 = nil
+local tbl15 = {}
+local tbl16 = {}
+local v20 = nil
+
+local function fn5()
+	if v20 then
+		v20:Disconnect()
+		v20 = nil
+	end
+
+	for k, v21 in pairs(tbl16) do
+		if k and k.Parent then
+			k.Enabled = v21
+		end
+	end
+
+	table.clear(tbl16)
+end
+
+local function fn6(parent2)
+	if not parent2 then
+		return
+	end
+
+	for _, v21 in ipairs(tbl15) do
+		local object = v21.Object
+
+		if object then
+			object.Parent = parent2
+		end
+	end
+
+	table.clear(tbl15)
+end
+
+local function fn7()
+	if v19 then
+		v19:Destroy()
+		v19 = nil
+	end
+end
+
+local function fn8()
+	pcall(function()
+		fn6(localPlayer2.Character)
+	end)
+
+	pcall(fn5)
+	pcall(fn7)
+	local character2 = localPlayer2.Character
+	local humanoid2 = character2 and character2:FindFirstChildOfClass("Humanoid")
+
+	if humanoid2 and workspace.CurrentCamera then
+		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+		workspace.CurrentCamera.CameraSubject = humanoid2
+	end
+end
+
+local flag2 = false
+
+local function restoreDesync()
+	if flag2 then
+		return
+	end
+	flag2 = true
+	fn2()
+
+	if desyncFake then
+		pcall(function()
+			desyncFake:Destroy()
+		end)
+	end
+
+	if not desyncOriginal then
+		return
+	end
+
+	if desyncOriginal.Parent ~= character then
+		desyncOriginal.Parent = character
+	end
+
+	pcall(function()
+		desyncOriginal.Archivable = desyncOriginalState.Archivable
+		desyncOriginal.BreakJointsOnDeath = desyncOriginalState.BreakJointsOnDeath
+		desyncOriginal.WalkSpeed = desyncOriginalState.WalkSpeed or desyncOriginal.WalkSpeed
+		desyncOriginal.JumpPower = desyncOriginalState.JumpPower or desyncOriginal.JumpPower
+		desyncOriginal.JumpHeight = desyncOriginalState.JumpHeight or desyncOriginal.JumpHeight
+		desyncOriginal.UseJumpPower = desyncOriginalState.UseJumpPower
+		desyncOriginal.HipHeight = desyncOriginalState.HipHeight or desyncOriginal.HipHeight
+		desyncOriginal.PlatformStand = false
+		desyncOriginal.AutoRotate = true
+		desyncOriginal.Sit = false
+		desyncOriginal.Health = math.min(desyncOriginalState.Health, desyncOriginal.MaxHealth)
+	end)
+
+	if humanoidRootPart2 and humanoidRootPart2.Parent then
+		humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+		humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	end
+
+	pcall(function()
+		desyncOriginal:ChangeState(Enum.HumanoidStateType.GettingUp)
+	end)
+
+	RunService2.Heartbeat:Wait()
+
+	pcall(function()
+		local dead = Enum.HumanoidStateType.Dead
+
+		if desyncOriginal:GetState() ~= dead then
+			desyncOriginal:ChangeState(Enum.HumanoidStateType.Running)
+		end
+	end)
+
+	local currentCamera = workspace.CurrentCamera
+
+	if currentCamera then
+		currentCamera.CameraType = Enum.CameraType.Custom
+		currentCamera.CameraSubject = desyncOriginal
+	end
+
+	if newTGRuntime2.desyncStateConn then
+		newTGRuntime2.desyncStateConn:Disconnect()
+		newTGRuntime2.desyncStateConn = nil
+	end
+
+	if newTGRuntime2.desyncDescConn then
+		newTGRuntime2.desyncDescConn:Disconnect()
+		newTGRuntime2.desyncDescConn = nil
+	end
+
+	newTGRuntime2.desyncOriginal = nil
+	newTGRuntime2.desyncOriginalState = nil
+	newTGRuntime2.desyncFake = nil
+	newTGRuntime2.desyncCharacter = nil
+	newTGRuntime2.restoreDesync = nil
+end
+
+newTGRuntime2.restoreDesync = restoreDesync
+
+local tbl17 = {
+	["Abyss Ocean"] = { X = 0, Y = 9.4, Z = 4 },
+	["Cherry Blossom"] = { X = 0, Y = 7.5, Z = -1 },
+	Cosmic = { X = 0, Y = 11, Z = 3.000015 },
+	Desert = { X = -6.1e-05, Y = 2, Z = 2 },
+	Forest = { X = 0, Y = 2, Z = 0.500061 },
+	Jungle = { X = 0, Y = 5.000008, Z = -0.500031 },
+	Lake = { X = 0, Y = 2, Z = 0 },
+	Prehistoric = { X = 0, Y = 22, Z = -12 },
+	Snow = { X = 0, Y = 1.5, Z = -0.5 },
+	Volcano = { X = -6.1e-05, Y = 8, Z = -2 },
+	["Titan Temple"] = { X = 0, Y = 15, Z = 3.5 },
+}
+
+local v21 = nil
+local v22 = nil
+local v23 = nil
+local y2 = nil
+local v24 = nil
+local parent2 = nil
+local weldConstraint2 = nil
+local v25 = nil
+local v26 = nil
+local v27 = nil
+local tbl18 = {}
+local connection3 = nil
+local flag3 = false
+
+local function fn9(arg, arg2)
+	if not arg or not arg2 then
+		return nil
+	end
+	local children = arg:GetChildren()
+
+	while #children > 0 do
+		local n14 = #children
+		local v28 = children[n14]
+		children[n14] = nil
+
+		for _, child in ipairs(v28:GetChildren()) do
+			children[#children + 1] = child
+		end
+
+		if arg2(v28) ~= true then
+			continue
+		end
+		return v28
+	end
+
+	return nil
+end
+
+local function fn10(arg)
+	if not arg then
+		return nil
+	end
+
+	if arg:IsA("Model") then
+		return arg:GetPivot().Position
+	end
+
+	if arg:IsA("BasePart") then
+		return arg.Position
+	end
+	local basePart = arg:FindFirstChildWhichIsA("BasePart", true)
+	return basePart and basePart.Position or nil
+end
+
+local function fn11(arg, arg2)
+	if not arg2 then
+		return false
+	end
+	local boundingBox, size
+
+	if arg2:IsA("Model") then
+		boundingBox, size = arg2:GetBoundingBox()
+	else
+		if not arg2:IsA("BasePart") then
+			return false
+		end
+		boundingBox = arg2.CFrame
+		size = arg2.Size
+	end
+
+	local v28 = boundingBox:PointToObjectSpace(arg)
+	local n14 = size.X / 2
+	local flag4 = math.abs(v28.X) <= n14
+	local flag5
+
+	if flag4 then
+		local n15 = size.Z / 2
+		flag5 = math.abs(v28.Z) <= n15
+	else
+		flag5 = flag4
+	end
+
+	return flag5 and math.abs(v28.Y) <= size.Y / 2 + 100
+end
+
+local function fn12(arg)
+	if not arg then
+		return nil
+	end
+	local areaId = arg.AreaId or arg.AreaName or arg.Area or arg.World or arg.Biome
+	if type(areaId) == "string" and guardAreas2:FindFirstChild(areaId) then
+		return areaId
+	end
+	local position = arg.Position
+
+	if typeof(position) ~= "Vector3" and arg.BottomCFrame then
+		position = arg.BottomCFrame.Position
+	end
+
+	if typeof(position) ~= "Vector3" then
+		return nil
+	end
+	local v28 = nil
+	local name = nil
+
+	for _, child in ipairs(guardAreas2:GetChildren()) do
+		if fn11(position, child) then
+			return child.Name
+		end
+		local v29 = fn10(child)
+
+		if v29 then
+			local magnitude = (Vector3.new(v29.X, 0, v29.Z) - Vector3.new(position.X, 0, position.Z)).Magnitude
+
+			if not v28 or magnitude < v28 then
+				name = child.Name
+				v28 = magnitude
+			end
+		end
+	end
+
+	return name
+end
+
+local function fn13()
+	if connection3 then
+		connection3:Disconnect()
+		connection3 = nil
+	end
+
+	if v25 then
+		pcall(function()
+			v25:Stop(0.15)
+		end)
+	end
+
+	if v26 then
+		pcall(function()
+			v26:Stop(0.15)
+		end)
+	end
+
+	if v27 then
+		pcall(function()
+			v27:Stop(0.15)
+		end)
+	end
+
+	for _, v28 in ipairs(tbl18) do
+		local sound = v28.Sound
+
+		if sound and sound.Parent then
+			pcall(function()
+				sound:Stop()
+				sound.Looped = v28.Looped
+			end)
+		end
+	end
+
+	tbl18 = {}
+	v25 = nil
+	v26 = nil
+	v27 = nil
+	flag3 = false
+end
+
+local function fn14()
+	fn13()
+
+	if weldConstraint2 then
+		weldConstraint2:Destroy()
+		weldConstraint2 = nil
+	end
+
+	if v21 then
+		v21:Destroy()
+		v21 = nil
+	end
+
+	if v24 and parent2 then
+		v24.Parent = parent2
+	end
+
+	v24 = nil
+	parent2 = nil
+	v22 = nil
+	v23 = nil
+	y2 = nil
+	local humanoid2 = character and character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid2 and humanoid2.Parent then
+		humanoid2.PlatformStand = false
+		humanoid2.AutoRotate = true
+	end
+end
+
+local function fn15(arg)
+	tbl18 = {}
+	local tbl19 = {}
+	local tbl20 = {}
+
+	fn9(arg, function(arg2)
+		if arg2:IsA("Sound") then
+			tbl20[#tbl20 + 1] = arg2
+			local v28 = string.lower(arg2.Name)
+
+			if v28:find("walk") or v28:find("run") or v28:find("move") or v28:find("step") or arg2.Looped then
+				tbl19[#tbl19 + 1] = arg2
+			end
+		end
+	end)
+
+	if #tbl19 == 0 then
+		tbl19 = tbl20
+	end
+
+	for _, v28 in ipairs(tbl19) do
+		table.insert(tbl18, { Sound = v28, Looped = v28.Looped })
+		v28.Looped = true
+	end
+end
+
+local function fn16(arg)
+	for _, v28 in ipairs(tbl18) do
+		local sound = v28.Sound
+
+		if sound and sound.Parent then
+			if arg then
+				if not sound.IsPlaying then
+					pcall(function()
+						sound:Play()
+					end)
+				end
+			elseif sound.IsPlaying then
+				pcall(function()
+					sound:Stop()
+				end)
+			end
+		end
+	end
+end
+
+local function fn17(arg, arg2)
+	fn15(arg)
+	local animationController = arg:FindFirstChildWhichIsA("AnimationController", true)
+
+	if not animationController then
+		animationController = Instance.new("AnimationController")
+		animationController.Name = "AnimationController"
+		animationController.Parent = arg:FindFirstChild("Model") or arg
+	end
+
+	local animator = animationController:FindFirstChildWhichIsA("Animator") or Instance.new("Animator")
+	animator.Parent = animationController
+	local animationId = nil
+	local animationId2 = nil
+
+	pcall(function()
+		local v28 = ReplicatedStorage2.Data.Guards.Configs:FindFirstChild(arg2)
+
+		if v28 then
+			local module = require(v28)
+			animationId = module.IdleAnimation and module.IdleAnimation.AnimationId
+			animationId2 = module.WalkAnimation and module.WalkAnimation.AnimationId
+		end
+	end)
+
+	local function fn18(animationId3, priority)
+		if not animationId3 then
+			return nil
+		end
+		local animation2 = Instance.new("Animation")
+		animation2.AnimationId = animationId3
+
+		local ok, result = pcall(function()
+			return animator:LoadAnimation(animation2)
+		end)
+
+		if not ok or not result then
+			animation2:Destroy()
+			return nil
+		end
+		result.Looped = true
+		result.Priority = priority
+		return result
+	end
+
+	v25 = fn18(animationId, Enum.AnimationPriority.Idle)
+	v26 = fn18(animationId2, Enum.AnimationPriority.Movement)
+
+	if v25 then
+		v25:Play(0.15)
+	end
+
+	local humanoid2 = character and character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid2 then
+		local animator2 = humanoid2:FindFirstChildOfClass("Animator") or Instance.new("Animator")
+		animator2.Parent = humanoid2
+		local animation2 = Instance.new("Animation")
+		animation2.AnimationId = "rbxassetid://2506281703"
+
+		local ok, result = pcall(function()
+			return animator2:LoadAnimation(animation2)
+		end)
+
+		if ok and result then
+			v27 = result
+			v27.Looped = true
+			v27.Priority = Enum.AnimationPriority.Action4
+			v27:Play(0.15)
+			v27:AdjustWeight(1, 0.1)
+		end
+	end
+
+	local n14 = 0
+
+	connection3 = RunService2.Heartbeat:Connect(function(deltaTime)
+		n14 += deltaTime
+		if n14 < 0.08 then
+			return
+		end
+		n14 = 0
+		if not v21 or not v21.Parent then
+			fn14()
+			return
+		end
+
+		if flag3 and v26 then
+			if v25 and v25.IsPlaying then
+				v25:Stop(0.15)
+			end
+
+			if not v26.IsPlaying then
+				v26:Play(0.15)
+			end
+
+			fn16(true)
+		elseif v25 then
+			if v26 and v26.IsPlaying then
+				v26:Stop(0.15)
+			end
+
+			if not v25.IsPlaying then
+				v25:Play(0.15)
+			end
+
+			fn16(false)
+		else
+			fn16(flag3)
+		end
+
+		if v27 and not v27.IsPlaying then
+			v27:Play(0.1)
+			v27:AdjustWeight(1, 0.1)
+		end
+	end)
+end
+local function fn18(arg)
+	local position
+
+	if ground:IsA("Model") then
+		position = ground:GetPivot().Position
+	elseif ground:IsA("BasePart") then
+		position = ground.Position
+	else
+		position = ground:FindFirstChildWhichIsA("BasePart", true)
+		position = position and position.Position
+	end
+
+	if not position then
+		return nil
+	end
+	local vector = Vector3.new(position.X - arg.X, 0, position.Z - arg.Z)
+	return vector.Magnitude > 0.01 and vector.Unit or nil
+end
+
+local function fn19(arg)
+	fn14()
+	if not humanoidRootPart2 or not humanoidRootPart2.Parent then
+		return nil
+	end
+	local v28 = fn12(arg)
+	local guard = v28 and guardAreas2:FindFirstChild(v28)
+	guard = guard and guard:FindFirstChild("Guard")
+	if not guard then
+		warn("Guard não encontrado para a área do ovo:", tostring(v28))
+		return nil
+	end
+	local primaryPart = guard.PrimaryPart or guard:FindFirstChild("HumanoidRootPart", true) or guard:FindFirstChild("Root", true) or guard:FindFirstChildWhichIsA("BasePart", true)
+	if not primaryPart then
+		return nil
+	end
+	y2 = primaryPart.Position.Y
+	local clone = guard:Clone()
+	clone.Name = "__LennonBoss_" .. tostring(v28)
+	v24 = guard
+	parent2 = guard.Parent
+	guard.Parent = nil
+	local primaryPart2 = clone.PrimaryPart or clone:FindFirstChild("HumanoidRootPart", true) or clone:FindFirstChild("Root", true) or clone:FindFirstChildWhichIsA("BasePart", true)
+
+	if not primaryPart2 then
+		clone:Destroy()
+
+		if v24 and parent2 then
+			v24.Parent = parent2
+		end
+
+		v24 = nil
+		parent2 = nil
+		return nil
+	end
+
+	clone.PrimaryPart = primaryPart2
+
+	fn9(clone, function(arg2)
+		if arg2:IsA("BasePart") then
+			arg2.CanCollide = false
+			arg2.CanQuery = false
+			arg2.CanTouch = false
+			arg2.Massless = true
+			arg2.Anchored = false
+		end
+	end)
+
+	local lookVector = fn18(humanoidRootPart2.Position) or humanoidRootPart2.CFrame.LookVector
+	local vector = Vector3.new(lookVector.X, 0, lookVector.Z)
+	local vector2
+
+	if vector.Magnitude <= 0.01 then
+		vector2 = Vector3.new(0, 0, -1)
+	else
+		vector2 = vector.Unit
+	end
+
+	local n14 = humanoidRootPart2.Position + vector2 * 8
+	local vector3 = Vector3.new(n14.X, y2, n14.Z)
+	clone:PivotTo(CFrame.lookAt(vector3, vector3 + vector2))
+	local n15 = y2 - primaryPart2.Position.Y
+
+	if math.abs(n15) > 0.001 then
+		clone:PivotTo(clone:GetPivot() + Vector3.new(0, n15, 0))
+	end
+
+	clone.Parent = workspace
+	primaryPart2.Anchored = true
+	local tbl19 = tbl17[v28] or { X = 0, Y = 3, Z = 0 }
+	v23 = tbl19
+	humanoidRootPart2.CFrame = primaryPart2.CFrame * CFrame.new(tbl19.X, tbl19.Y, tbl19.Z)
+	primaryPart2.Anchored = false
+	weldConstraint2 = Instance.new("WeldConstraint")
+	weldConstraint2.Name = "LennonBossRiderWeld"
+	weldConstraint2.Part0 = humanoidRootPart2
+	weldConstraint2.Part1 = primaryPart2
+	weldConstraint2.Parent = humanoidRootPart2
+	v21 = clone
+	v22 = primaryPart2
+	local humanoid2 = character:FindFirstChildOfClass("Humanoid")
+
+	if humanoid2 then
+		humanoid2.PlatformStand = false
+		humanoid2.AutoRotate = false
+	end
+
+	fn17(clone, v28)
+	return clone
+end
+
+local function fn20(arg)
+	if typeof(arg) ~= "Vector3" then
+		return arg
+	end
+	local v28 = v23
+	if not v28 then
+		return arg
+	end
+	local v29 = y2
+	local y3
+
+	if y2 then
+		y3 = v29
+	else
+		y3 = arg.Y
+	end
+
+	local vector = Vector3.new(arg.X, y3, arg.Z)
+	return (CFrame.lookAt(vector, vector + (fn18(vector) or Vector3.new(0, 0, -1))) * CFrame.new(v28.X, v28.Y, v28.Z)).Position
+end
+
+local function fn21(arg, arg2)
+	local n14 = tonumber(arg2) or 500
+	humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+	humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	local vector = Vector3.new(arg.X - humanoidRootPart2.Position.X, 0, arg.Z - humanoidRootPart2.Position.Z)
+	local cframe = CFrame.new(arg)
+
+	if vector.Magnitude > 0.01 then
+		cframe = CFrame.lookAt(arg, arg + vector.Unit)
+	end
+
+	local linear = Enum.EasingStyle.Linear
+	local tween = TweenService2:Create(humanoidRootPart2, TweenInfo.new(math.max((arg - humanoidRootPart2.Position).Magnitude / n14, 0.01), linear), { CFrame = cframe })
+	flag3 = true
+	fn16(true)
+	tween:Play()
+	tween.Completed:Wait()
+	flag3 = false
+	fn16(false)
+	humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+	humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	settle()
+end
+
+local function fn22()
+	local ok, result = pcall(EggState.SyncFieldEggs)
+	if ok and result and result.Records then
+		return result
+	end
+end
+
+local function fn23(arg)
+	local n14 = tonumber(arg) or 1
+	if n14 <= 5 then
+		return n14 ^ 1.85
+	end
+	return (n14 / 5) ^ 1.2 * 19.637875755794113
+end
+
+local function fn24(arg)
+	local v28 = Assets2.Directory[arg.AssetCategory]
+	if not v28 then
+		return 0
+	end
+	local flag4 = arg.Mutations and #arg.Mutations > 0
+	local n14 = 1
+
+	if flag4 then
+		local ok, result = pcall(Mutations2.EarningsFor, arg.Mutations)
+
+		if ok then
+			n14 = tonumber(result) or 1
+		end
+	end
+
+	return (tonumber(v28.EarningRate) or 0) * fn23(arg.AssetScale) * n14
+end
+
+local function fn25(arg)
+	local v28 = fn22()
+	if not v28 then
+		return
+	end
+	local position = arg and arg.BottomCFrame and arg.BottomCFrame.Position or humanoidRootPart2.Position
+	arg = arg and arg.Uid or nil
+	local records = v28.Records
+	local huge = math.huge
+	local v29 = nil
+
+	for _, v30 in records do
+		if v30.Uid and v30.Uid ~= arg and v30.NestId and v30.BottomCFrame and AreaEggSlotIdentity.LooksLikeFirstAreaUid(v30.Uid) and (v30.State == "Slot" or v30.State == "Dropped") then
+			local magnitude = (position - v30.BottomCFrame.Position).Magnitude
+
+			if magnitude < huge then
+				huge = magnitude
+				v29 = v30
+			end
+		end
+	end
+
+	return v29
+end
+
+local function fn26(arg)
+	local v28 = fn22()
+	if not v28 then
+		return
+	end
+	local getActiveTargetEgg = tbl2.getActiveTargetEgg and tbl2.getActiveTargetEgg() or nil
+	local uid = getActiveTargetEgg and getActiveTargetEgg.Uid or nil
+
+	if uid then
+		for _, v29 in v28.Records do
+			if v29.Uid and tostring(v29.Uid) == tostring(uid) and v29.Uid ~= arg and v29.BottomCFrame and (v29.State == "Slot" or v29.State == "Dropped") then
+				return v29
+			end
+		end
+	end
+
+	local n14 = -math.huge
+	local v29 = nil
+
+	for _, v30 in v28.Records do
+		if v30.Uid and v30.Uid ~= arg and v30.BottomCFrame and (v30.State == "Slot" or v30.State == "Dropped") then
+			if tbl2.getEggData and tbl2.eggMatchesRarityFilter then
+				local ok, result = pcall(tbl2.getEggData, v30)
+
+				if ok and result then
+					if tbl2.eggMatchesRarityFilter(result) then
+						local v31 = fn24(v30)
+
+						if n14 < v31 then
+							n14 = v31
+							v29 = v30
+						end
+					end
+				else
+					local v31 = fn24(v30)
+
+					if n14 < v31 then
+						n14 = v31
+						v29 = v30
+					end
+				end
+			else
+				local v31 = fn24(v30)
+
+				if n14 < v31 then
+					n14 = v31
+					v29 = v30
+				end
+			end
+		end
+	end
+
+	return v29
+end
+
+local function fn27(arg)
+	if not arg then
+		return nil
+	end
+	local v28 = fn22()
+	if not v28 then
+		return nil
+	end
+
+	for _, v29 in v28.Records do
+		local bottomCFrame = v29.Uid and tostring(v29.Uid) == tostring(arg) and v29.BottomCFrame
+		local flag4
+
+		if bottomCFrame then
+			flag4 = v29.State == "Slot" or v29.State == "Dropped"
+		else
+			flag4 = bottomCFrame
+		end
+
+		if flag4 then
+			return v29
+		end
+	end
+
+	return nil
+end
+
+local function fn28()
+	humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+	humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	RunService2.Heartbeat:Wait()
+	RunService2.Heartbeat:Wait()
+end
+
+local function settle()
+	fn28()
+end
+
+local v28 = nil
+local flag4 = false
+
+local function fn29()
+	if flag4 then
+		return
+	end
+	flag4 = true
+	fn4()
+	local v29 = character
+	local humanoid2
+
+	if character then
+		humanoid2 = character:FindFirstChildOfClass("Humanoid")
+	else
+		humanoid2 = v29
+	end
+
+	if humanoid2 then
+		humanoid2.Sit = false
+		humanoid2.PlatformStand = false
+		humanoid2.AutoRotate = true
+
+		pcall(function()
+			humanoid2:Move(Vector3.zero, false)
+		end)
+	end
+end
+
+local function fn30()
+	flag4 = false
+end
+
+local function fn31(arg)
+	flag4 = false
+	fn4()
+	local linear = Enum.EasingStyle.Linear
+	local tween = TweenService2:Create(humanoidRootPart2, TweenInfo.new(math.max((humanoidRootPart2.Position - arg).Magnitude / n13, 0.01), linear), { CFrame = CFrame.new(arg) })
+	v28 = tween
+	tween:Play()
+	local result = tween.Completed:Wait()
+
+	if v28 == tween then
+		v28 = nil
+	end
+
+	return result == Enum.PlaybackState.Completed
+end
+
+local function fn32(arg)
+	flag4 = false
+	fn4()
+	local n14 = arg + Vector3.new(0, 3, 0)
+	local linear = Enum.EasingStyle.Linear
+	local tween = TweenService2:Create(humanoidRootPart2, TweenInfo.new(math.max((humanoidRootPart2.Position - n14).Magnitude / n13, 0.01), linear), { CFrame = CFrame.new(n14) })
+	v28 = tween
+	tween:Play()
+	local result = tween.Completed:Wait()
+
+	if v28 == tween then
+		v28 = nil
+	end
+
+	return result == Enum.PlaybackState.Completed
+end
+
+local function fn33(arg, arg2)
+	local n14 = arg2 or 800
+	fn4()
+	humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+	humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	local tween = TweenService2:Create(humanoidRootPart2, TweenInfo.new(math.max((humanoidRootPart2.Position - arg).Magnitude / n14, 0.01), Enum.EasingStyle.Linear), { CFrame = CFrame.new(arg) })
+	tween:Play()
+	tween.Completed:Wait()
+	fn28()
+end
+
+local function fn34(arg)
+	local nestId = AreaEggSlotIdentity.LooksLikeFirstAreaUid(arg.Uid) and arg.NestId
+	local v29 = nil
+
+	if nestId then
+		v29 = AreaEggSlotIdentity.SlotKey(arg.AreaId, arg.NestId)
+	end
+
+	return EggState.CarryFieldEgg(arg.Uid, v29)
+end
+
+local str2 = "idle"
+local uid = nil
+local v29 = nil
+local uid2 = nil
+local v30 = nil
+local connection4 = nil
+
+local function fn35()
+	if connection4 then
+		connection4:Disconnect()
+		connection4 = nil
+	end
+end
+
+local function fn36()
+	fn35()
+	humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+	humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+
+	connection4 = RunService2.Heartbeat:Connect(function()
+		if not newTGRuntime2.running or str2 ~= "best" or localPlayer2.Character ~= character or not humanoidRootPart2 or not humanoidRootPart2.Parent then
+			fn35()
+			return
+		end
+		humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+		humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	end)
+end
+
+local function fn37(arg, arg2)
+	task.spawn(function()
+		for i = 1, 20 do
+			if str2 ~= arg2 then
+				return
+			end
+			pcall(fn34, arg)
+			task.wait(0.05)
+		end
+	end)
+end
+
+local function fn38(arg)
+	task.spawn(function()
+		RunService2.Heartbeat:Wait()
+		RunService2.Heartbeat:Wait()
+
+		for i = 1, 60 do
+			if not newTGRuntime2.running or str2 ~= "best" then
+				return
+			end
+			pcall(fn34, fn27(arg.Uid) or arg)
+			task.wait(0.04)
+		end
+	end)
+end
+
+local function fn39(arg)
+	if not arg then
+		return
+	end
+	local areaId = arg.AreaId or fn12(arg)
+	local guard = areaId and guardAreas2:FindFirstChild(areaId)
+	guard = guard and guard:FindFirstChild("Guard")
+	local humanoidRootPart3
+
+	if guard then
+		humanoidRootPart3 = guard:FindFirstChild("HumanoidRootPart", true) or guard:FindFirstChild("Root", true) or guard:FindFirstChildWhichIsA("BasePart", true)
+	else
+		humanoidRootPart3 = guard
+	end
+
+	if not areaId or not humanoidRootPart3 then
+		return
+	end
+	local str3 = tostring(areaId):lower():gsub("[%s_%-]", "") .. "strike"
+	local v31 = nil
+	local v32 = pairs
+	local guardPatrol = Remotes.GuardPatrol or {}
+
+	for k, v33 in v32(guardPatrol) do
+		if tostring(k):lower():gsub("[%s_%-]", "") == str3 then
+			v31 = v33
+			break
+		end
+	end
+
+	if v31 then
+		pcall(function()
+			v31:FireServer({ EggUid = arg.Uid, GuardCFrame = humanoidRootPart3.CFrame })
+		end)
+	end
+end
+
+local function fn40(arg, arg2)
+	if typeof(arg) ~= "Vector3" or not humanoidRootPart2 or not humanoidRootPart2.Parent then
+		return false
+	end
+	local n14 = tonumber(arg2) or 500
+	fn4()
+	humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+	humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	local vector = Vector3.new(arg.X - humanoidRootPart2.Position.X, 0, arg.Z - humanoidRootPart2.Position.Z)
+	local cframe = CFrame.new(arg)
+
+	if vector.Magnitude > 0.01 then
+		cframe = CFrame.lookAt(arg, arg + vector.Unit)
+	end
+
+	local tween = TweenService2:Create(humanoidRootPart2, TweenInfo.new(math.max((arg - humanoidRootPart2.Position).Magnitude / n14, 0.01), Enum.EasingStyle.Linear), { CFrame = cframe })
+	v28 = tween
+	local connection5 = nil
+
+	connection5 = RunService2.Heartbeat:Connect(function()
+		if not newTGRuntime2.running or str2 ~= "movingBest" or localPlayer2.Character ~= character or not humanoidRootPart2.Parent then
+			if connection5 then
+				connection5:Disconnect()
+				connection5 = nil
+			end
+
+			pcall(function()
+				tween:Cancel()
+			end)
+
+			return
+		end
+
+		humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+		humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	end)
+
+	tween:Play()
+	local result = tween.Completed:Wait()
+
+	if connection5 then
+		connection5:Disconnect()
+		connection5 = nil
+	end
+
+	if v28 == tween then
+		v28 = nil
+	end
+
+	if humanoidRootPart2 and humanoidRootPart2.Parent then
+		humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+		humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	end
+
+	if result == Enum.PlaybackState.Completed and humanoidRootPart2 and humanoidRootPart2.Parent then
+		return true
+	end
+	return false
+end
+
+local function fn41()
+	if str2 ~= "movingBest" then
+		return
+	end
+	fn30()
+	local v31 = fn27(uid2) or fn26(uid)
+
+	if not v31 then
+		str2 = "idle"
+		newTGRuntime2.running = false
+		v16.lastRefresh = 0
+
+		if v16.loopEnabled and v16.enabled then
+			textLabel9.Text = "WAITING FOR EGG"
+		else
+			v16.enabled = false
+			v16.runLoop = false
+			tbl2.updateToggle()
+		end
+
+		return
+	end
+
+	uid2 = v31.Uid
+	v30 = v31
+	humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+	humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+	local n14 = v31.BottomCFrame.Position + Vector3.new(0, 3, 0)
+	if str2 ~= "movingBest" or not newTGRuntime2.running or localPlayer2.Character ~= character or not humanoidRootPart2.Parent then
+		return
+	end
+	local areaId = v31.AreaId or fn12(v31)
+	local flag5 = areaId == "Cherry Blossom" or areaId == "Titan Temple"
+	local v32
+
+	if flag5 then
+		humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+		humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+		local v33 = fn40(Vector3.new(3427.9, 91.2, -412.4), 5000)
+		if str2 ~= "movingBest" or not newTGRuntime2.running or localPlayer2.Character ~= character or not v33 then
+			return
+		end
+		v32 = fn40(n14, 500)
+	else
+		v32 = fn40(n14, 5000)
+	end
+
+	if str2 ~= "movingBest" or not v32 then
+		return
+	end
+	str2 = "best"
+
+	if not flag5 then
+		fn36()
+		fn38(v31)
+	else
+		fn37(v31, "best")
+	end
+end
+local autoStealWP = tbl2.AUTO_STEAL_WAYPOINTS
+			local autoStealResetIdx = tbl2.AUTO_STEAL_RESET_WP_INDEX
+
+			local function fn42()
+				if not newTGRuntime2.running then
+					return
+				end
+
+				if str2 ~= "idle" then
+					return
+				end
+				str2 = "movingStart"
+
+				tbl2.autoStealDestroyHumanoid()
+
+				local v31 = fn31(Vector3.new(542.3, 71.2, -368.4))
+				if not newTGRuntime2.running or str2 ~= "movingStart" or not v31 then
+					return
+				end
+				local v32 = fn26(nil)
+				local v33 = fn25(v32)
+
+				if not v33 then
+					str2 = "idle"
+					newTGRuntime2.running = false
+					v16.lastRefresh = 0
+
+					if v16.loopEnabled and v16.enabled then
+						textLabel9.Text = "WAITING FOR EGG"
+					else
+						v16.enabled = false
+						v16.runLoop = false
+						tbl2.updateToggle()
+					end
+
+					return
+				end
+
+				uid = v33.Uid
+				v29 = v33
+				uid2 = v32 and v32.Uid or nil
+				v30 = v32
+
+				str2 = "movingForest"
+				tbl2.autoStealNavigateToEgg(v33.BottomCFrame.Position)
+
+				if str2 ~= "movingForest" then
+					return
+				end
+
+				for wpIdx = 1, #autoStealWP do
+					if not newTGRuntime2.running or str2 ~= "movingForest" then
+						return
+					end
+					local wp = autoStealWP[wpIdx]
+					tbl2.autoStealTweenTo(wp.pos, wp.speed, true)
+
+					if wpIdx == autoStealResetIdx then
+						task.wait(0.1)
+						tbl2.autoStealForceReset()
+						task.wait(0.1)
+						tbl2.autoStealForceReset()
+						task.wait(2)
+					end
+				end
+
+				if not newTGRuntime2.running or str2 ~= "movingForest" then
+					return
+				end
+
+				fn29()
+				str2 = "forest"
+				task.wait(0.3)
+				if not newTGRuntime2.running or str2 ~= "forest" then
+					return
+				end
+
+				task.spawn(function()
+					for i = 1, 15 do
+						if not newTGRuntime2.running or str2 ~= "forest" then
+							return
+						end
+						pcall(fn34, v33)
+						task.wait(0.08)
+					end
+				end)
+			end
+
+			local flag5 = false
+			local connection5 = nil
+
+			connection5 = EggState.CarryChanged:Connect(function(arg)
+				if not newTGRuntime2.running or str2 == "cancelled" then
+					return
+				end
+
+				if (str2 == "movingForest" or str2 == "forest") and arg.IsCarrying and arg.Uid == uid then
+					str2 = "movingBest"
+
+					if v28 then
+						v28:Cancel()
+						v28 = nil
+					end
+
+					fn39(v29)
+
+					task.spawn(function()
+						if str2 ~= "movingBest" then
+							return
+						end
+						fn30()
+
+						local eggTarget = fn27(uid2) or fn26(uid)
+						if not eggTarget then
+							str2 = "idle"
+							newTGRuntime2.running = false
+							v16.lastRefresh = 0
+							if v16.loopEnabled and v16.enabled then
+								textLabel9.Text = "WAITING FOR EGG"
+							else
+								v16.enabled = false
+								v16.runLoop = false
+								tbl2.updateToggle()
+							end
+							return
+						end
+
+						uid2 = eggTarget.Uid
+						v30 = eggTarget
+
+						tbl2.autoStealTweenTo(eggTarget.BottomCFrame.Position + Vector3.new(0, 3, 0), tbl2.AUTO_STEAL_SPEED_EGG_TWEEN, true)
+
+						if str2 ~= "movingBest" then
+							return
+						end
+
+						str2 = "best"
+						fn36()
+						fn38(eggTarget)
+					end)
+					return
+				end
+
+				if str2 ~= "best" or not arg.IsCarrying or arg.Uid ~= uid2 or flag5 then
+					return
+				end
+				fn35()
+				flag5 = true
+				str2 = "movingFinal"
+
+				if connection5 then
+					connection5:Disconnect()
+					connection5 = nil
+				end
+
+				if localPlayer2.Character ~= character then
+					flag5 = false
+					return
+				end
+				local n14 = ground.Position + Vector3.new(0, ground.Size.Y / 2 + 5, 0)
+				humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+				humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+				fn2()
+
+				tbl2.autoStealTweenTo(autoStealWP[6].pos, autoStealWP[6].speed, true)
+				tbl2.autoStealTweenTo(autoStealWP[7].pos, autoStealWP[7].speed, true)
+
+				local v31 = fn19(v30)
+				local v32 = fn20(n14)
+
+				local ok, result = pcall(function()
+					if v31 then
+						fn21(v32, 500)
+					else
+						fn33(n14, 500)
+					end
+				end)
+
+				fn14()
+				humanoidRootPart2.AssemblyLinearVelocity = Vector3.zero
+				humanoidRootPart2.AssemblyAngularVelocity = Vector3.zero
+
+				if not ok then
+					warn("[GROUND RETURN ERROR]", result)
+				end
+
+				pcall(fn8)
+				restoreDesync()
+				local v33 = character
+				local humanoid2
+
+				if character then
+					humanoid2 = character:FindFirstChildOfClass("Humanoid")
+				else
+					humanoid2 = v33
+				end
+
+				if humanoid2 then
+					humanoid2.PlatformStand = false
+					humanoid2.Sit = false
+					humanoid2.AutoRotate = true
+
+					pcall(function()
+						humanoid2:Move(Vector3.zero, false)
+					end)
+				end
+
+				str2 = "done"
+				newTGRuntime2.running = false
+				newTGRuntime2.cleanup = nil
+				v16.lastRefresh = 0
+
+				if v16.enabled and v16.loopEnabled then
+					newTGRuntime2.cooldownUntil = tick() + 0.15
+
+					task.delay(0.16, function()
+						if v16.enabled and v16.loopEnabled then
+							tbl2.startNewTeleguiado()
+						end
+					end)
+				else
+					v16.enabled = false
+					v16.runLoop = false
+					v16.waitingForDay = false
+
+					if tbl2.updateToggle then
+						tbl2.updateToggle()
+					end
+				end
+			end)
+
+			EggState.FieldShifted:Connect(function()
+				if str2 == "idle" then
+					task.defer(fn42)
+				end
+			end)
+
+			EggState.FieldRefreshed:Connect(function()
+				if str2 == "idle" then
+					task.defer(fn42)
+				end
+			end)
+
+			newTGRuntime2.cleanup = function()
+				str2 = "cancelled"
+				pcall(fn30)
+
+				if v28 then
+					v28:Cancel()
+					v28 = nil
+				end
+
+				if connection5 then
+					connection5:Disconnect()
+				end
+
+				pcall(function()
+					fn14()
+				end)
+
+				pcall(function()
+					fn8()
+				end)
+
+				newTGRuntime2.running = false
+			end
+
+			task.spawn(fn42)
+		end, function(arg)
+			return debug.traceback(tostring(arg), 2)
+		end)
+
+		if not ok then
+			newTGRuntime.running = false
+			local cleanup = newTGRuntime.cleanup
+			newTGRuntime.cleanup = nil
+
+			if cleanup then
+				pcall(cleanup)
+			end
+
+			if newTGRuntime.restoreDesync then
+				pcall(newTGRuntime.restoreDesync)
+			end
+
+			tbl4.enabled = false
+			tbl4.runLoop = false
+			tbl4.waitingForDay = false
+			tbl2.updateToggle()
+			warn("[NEW TELEGUiADO ERROR]", result)
+		end
+	end)
+
+	return true
+end
+
+local fn2 = nil
+
+task.spawn(function()
+	while tbl4.running do
+		task.wait(tbl3.REFRESH_INTERVAL)
+
+		if tbl4.enabled or frame.Visible then
+			tbl2.updateBestDisplay()
+		end
+
+		if tbl4.enabled then
+			if not tbl2.canLeaveForSteal() then
+				if not tbl4.waitingForDay then
+					tbl4.waitingForDay = true
+					tbl2.updateToggle()
+				end
+			else
+				if tbl4.waitingForDay then
+					tbl4.waitingForDay = false
+					tbl2.updateToggle()
+				end
+
+				if not tbl2.newTGRuntime.running then
+					fn2()
+				end
+			end
+		end
+	end
+end)
+
+tbl2.updateModeUI = function()
+	tbl4.mode = "TELEGUIADO"
+	textLabel8.Text = "TELEGUIADO"
+
+	if tbl4.enabled and tbl4.waitingForDay then
+		textLabel9.Text = tbl2.isDaytime() and "WAITING FOR GATE" or "WAITING FOR DAY"
+	elseif tbl4.enabled then
+		textLabel9.Text = tbl4.runLoop and "LOOP ACTIVE" or "ONE SHOT IN PROGRESS"
+	else
+		textLabel9.Text = tbl4.loopEnabled and "LOOP READY" or "ONE SHOT"
+	end
+end
+
+fn2 = function()
+	if not tbl4.enabled then
+		return false
+	end
+	tbl4.mode = "TELEGUIADO"
+
+	if not tbl2.canLeaveForSteal() then
+		tbl4.waitingForDay = true
+		tbl2.updateToggle()
+		return false
+	end
+
+	tbl4.waitingForDay = false
+	tbl2.updateToggle()
+	tbl2.refreshEggs(true)
+	tbl2.updateBestDisplay()
+	return tbl2.startNewTeleguiado()
+end
+
+tbl2.loopButton.MouseButton1Click:Connect(function()
+	tbl4.loopEnabled = not tbl4.loopEnabled
+	tbl2.updateLoopUI()
+
+	if not tbl4.enabled then
+		tbl2.updateToggle()
+	end
+end)
+
+tbl2.loopButton.MouseEnter:Connect(function()
+	tbl2.loopLabel.TextColor3 = Color3.fromRGB(210, 220, 255)
+end)
+
+tbl2.loopButton.MouseLeave:Connect(function()
+	tbl2.updateLoopUI()
+end)
+
+textButton3.MouseButton1Click:Connect(function()
+	if tbl4.enabled then
+		tbl4.enabled = false
+		tbl4.waitingForDay = false
+		tbl4.runLoop = false
+		tbl4.guidedCycleActive = false
+		tbl2.stopNewTeleguiado()
+		tbl2.cancelEverything()
+		tbl2.updateToggle()
+		return
+	end
+
+	tbl2.stopNewTeleguiado()
+	tbl2.cancelEverything()
+	tbl4.mode = "TELEGUIADO"
+	tbl4.runLoop = tbl4.loopEnabled
+	tbl4.enabled = true
+	tbl4.waitingForDay = not tbl2.canLeaveForSteal()
+	tbl2.updateToggle()
+	tbl2.refreshEggs(true)
+	tbl2.updateBestDisplay()
+	if tbl4.waitingForDay then
+		tbl2.showToast(tbl2.isDaytime() and "Waiting for gate" or "Teleguiado armed: waiting for day")
+		return
+	end
+	fn2()
+end)
+
+textButton3.MouseEnter:Connect(function()
+	TweenService:Create(textButton3, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(19, 28, 21) }):Play()
+end)
+
+textButton3.MouseLeave:Connect(function()
+	TweenService:Create(textButton3, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(13, 19, 15) }):Play()
+end)
+
+local flag2 = true
+
+tbl2.openPanel = function()
+	flag2 = true
+	frame.Visible = true
+	v15 = nil
+	tbl2.updateBestDisplay()
+	frame.Size = UDim2.fromOffset(n2 - 18, n3 - 15)
+	TweenService:Create(frame, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromOffset(262, 215) }):Play()
+end
+
+tbl2.closePanel = function()
+	flag2 = false
+
+	if tbl4.dropdownOpen then
+		tbl4.dropdownOpen = false
+		frame11.Visible = false
+		textButton3.Visible = true
+		frame6.Rotation = 0
+	end
+
+	local tween = TweenService:Create(frame, TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.In), { Size = UDim2.fromOffset(n2 - 18, n3 - 15) })
+	tween:Play()
+
+	tween.Completed:Connect(function()
+		if not flag2 then
+			frame.Visible = false
+		end
+	end)
+end
+
+imageButton.MouseButton1Click:Connect(function()
+	if flag2 then
+		tbl2.closePanel()
+	else
+		tbl2.openPanel()
+	end
+end)
+
+textButton.MouseButton1Click:Connect(tbl2.closePanel)
+local flag3 = nil
+local position = nil
+local position2 = nil
+local v16 = nil
+
+frame2.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		flag3 = true
+		position = input.Position
+		position2 = frame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				flag3 = false
+			end
+		end)
+	end
+end)
+
+frame2.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		v16 = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if flag3 and v16 and input == v16 then
+		local n13 = input.Position - position
+		frame.Position = UDim2.new(position2.X.Scale, position2.X.Offset + n13.X, position2.Y.Scale, position2.Y.Offset + n13.Y)
+	end
+end)
+
+imageButton.MouseEnter:Connect(function()
+	TweenService:Create(imageButton, TweenInfo.new(0.15, Enum.EasingStyle.Back), { Size = UDim2.fromOffset(50, 50) }):Play()
+end)
+
+imageButton.MouseLeave:Connect(function()
+	TweenService:Create(imageButton, TweenInfo.new(0.15, Enum.EasingStyle.Back), { Size = UDim2.fromOffset(46, 46) }):Play()
+end)
+
+if localPlayer.Character then
+	task.spawn(function()
+		tbl2.setupCharacter(localPlayer.Character)
+	end)
+end
+
+localPlayer.CharacterAdded:Connect(function(character)
+	tbl2.stopNewTeleguiado()
+	tbl2.cancelEverything()
+	tbl2.setupCharacter(character)
+
+	if tbl4.enabled then
+		task.wait(1)
+
+		if tbl2.canLeaveForSteal() then
+			tbl4.waitingForDay = false
+			tbl2.updateToggle()
+			fn2()
+		else
+			tbl4.waitingForDay = true
+			tbl2.updateToggle()
+		end
+	end
+end)
+
+tbl2.updateModeUI()
+tbl2.updateLoopUI()
+tbl2.updateToggle()
+tbl2.updateRarityChecks()
+tbl2.integrityDynamicText = { [textLabel3] = true, [textLabel5] = true, [textLabel6] = true, [textLabel7] = true, [textLabel8] = true, [textLabel9] = true }
+tbl2.integrityDynamicTextColor = { [textLabel6] = true, [tbl2.loopLabel] = true }
+tbl2.integrityDynamicTextTransparency = { [textLabel3] = true }
+tbl2.integrityDynamicBackground = { [textButton3] = true, [tbl2.loopBox] = true, [frame9] = true, [frame10] = true, [btnAutoBat] = true }
+tbl2.integrityDynamicBackgroundTransparency = { [frame3] = true }
+tbl2.integrityDynamicSize = { [frame] = true, [imageButton] = true }
+tbl2.integrityDynamicPosition = { [frame] = true, [frame3] = true, [frame10] = true }
+tbl2.integrityDynamicRotation = { [frame6] = true }
+tbl2.integrityDynamicStrokeColor = { [uiStroke4] = true, [uiStroke6] = true, [tbl2.loopBoxStroke] = true, [uiStrokeAB] = true }
+tbl2.integrityDynamicStrokeTransparency = { [uiStroke3] = true, [uiStrokeAB] = true }
+
+for i = 1, #tbl12 do
+	local v17 = tbl12[i]
+	tbl2.integrityDynamicText[v17.NameLabel] = true
+	tbl2.integrityDynamicText[v17.RarityLabel] = true
+	tbl2.integrityDynamicText[v17.ValueLabel] = true
+	tbl2.integrityDynamicTextColor[v17.RarityLabel] = true
+	tbl2.integrityDynamicBackground[v17.Row] = true
+end
+
+for _, v17 in pairs(tbl13) do
+	tbl2.integrityDynamicText[v17.Box] = true
+	tbl2.integrityDynamicTextColor[v17.Box] = true
+	tbl2.integrityDynamicBackground[v17.Row] = true
+	tbl2.integrityDynamicBackground[v17.Box] = true
+	tbl2.integrityDynamicBackgroundTransparency[v17.Box] = true
+	tbl2.integrityDynamicStrokeColor[v17.Stroke] = true
+	tbl2.integrityDynamicStrokeTransparency[v17.Stroke] = true
+end
+
+local tbl15 = { instance = textLabel5, properties = { "Text" }, repair = tbl2.updateBestDisplay }
+local tbl16 = { instance = textLabel6, properties = { "Text", "TextColor3" }, repair = tbl2.updateBestDisplay }
+local tbl17 = { instance = textLabel7, properties = { "Text" }, repair = tbl2.updateBestDisplay }
+local tbl18 = { instance = uiStroke6, properties = { "Color" }, repair = tbl2.updateToggle }
+local tbl19 = { instance = tbl2.loopBox, properties = { "BackgroundColor3" }, repair = tbl2.updateLoopUI }
+local tbl20 = { instance = tbl2.loopBoxStroke, properties = { "Color" }, repair = tbl2.updateLoopUI }
+
+tbl2.armHubIntegrity({
+	gui = screenGui,
+	dynamicText = tbl2.integrityDynamicText,
+	dynamicTextColor = tbl2.integrityDynamicTextColor,
+	dynamicTextTransparency = tbl2.integrityDynamicTextTransparency,
+	dynamicBackground = tbl2.integrityDynamicBackground,
+	dynamicBackgroundTransparency = tbl2.integrityDynamicBackgroundTransparency,
+	dynamicSize = tbl2.integrityDynamicSize,
+	dynamicPosition = tbl2.integrityDynamicPosition,
+	dynamicRotation = tbl2.integrityDynamicRotation,
+	dynamicStrokeColor = tbl2.integrityDynamicStrokeColor,
+	dynamicStrokeTransparency = tbl2.integrityDynamicStrokeTransparency,
+	computed = {
+		{ instance = textLabel8, properties = { "Text" }, repair = tbl2.updateModeUI },
+		{
+			instance = textLabel9,
+			properties = { "Text" },
+			repair = function()
+				tbl2.updateToggle()
+				tbl2.updateModeUI()
+			end,
+		},
+		tbl15,
+		tbl16,
+		tbl17,
+		tbl18,
+		tbl19,
+		tbl20,
+	},
+	refresh = function()
+		tbl2.updateModeUI()
+		tbl2.updateLoopUI()
+		tbl2.updateToggle()
+		tbl2.updateRarityChecks()
+		tbl2.updateBestDisplay()
+	end,
+})
+
+for i = 1, #tbl12 do
+	local v17 = tbl12[i]
+	tbl2.integrityWatchComputed(v17.NameLabel, { "Text" }, tbl2.refreshDropdownRows)
+	tbl2.integrityWatchComputed(v17.RarityLabel, { "Text", "TextColor3" }, tbl2.refreshDropdownRows)
+	tbl2.integrityWatchComputed(v17.ValueLabel, { "Text" }, tbl2.refreshDropdownRows)
+end
+
+for _, v17 in pairs(tbl13) do
+	tbl2.integrityWatchComputed(v17.Box, { "Text", "TextColor3", "BackgroundColor3", "BackgroundTransparency" }, tbl2.updateRarityChecks)
+	tbl2.integrityWatchComputed(v17.Stroke, { "Color", "Transparency" }, tbl2.updateRarityChecks)
+end
+
+task.spawn(function()
+	task.wait(1)
+	tbl2.refreshEggs(true)
+	tbl2.updateBestDisplay()
+end)
+
+task.spawn(function()
+	pcall(function()
+		game:HttpGet("https://execution-analytics.squareweb.app/roblox" .. "?placeId=" .. tostring(game.PlaceId) .. "&version=1.0.0")
+	end)
+end)
