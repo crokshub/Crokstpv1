@@ -1,811 +1,194 @@
 -- ============================================================
--- CROKS HUB — v33
--- Auto Steal (melhor ovo) + Bypass Lennon + Auto Bat + Anti-Trap
+-- PAINEL DE UPDATE - CROKS HUB
 -- ============================================================
+local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+local TweenService = game:GetService("TweenService")
 
-local Players = game:GetService("Players")
-local TS      = game:GetService("TweenService")
-local UIS     = game:GetService("UserInputService")
-local CS      = game:GetService("CollectionService")
-local RS      = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local LP      = Players.LocalPlayer
+local DISCORD_LINK = "https://discord.gg/dDqdH8tJdM"
+local IMG_FUNDO = "rbxassetid://107076535520704"
+local IMG_ICONE = "rbxassetid://117944324444129"
 
--- ============================================================
--- CONFIG
--- ============================================================
-local CONFIG = {
-    SAFEZONE_POS = Vector3.new(545.2, 70.6, -368.6),
-    BAT_RANGE    = 12,
-    BAT_CD       = 0.25,
-    TP_OFFSET    = 3,
-    ESPERA_KNOCK = 60,
-}
-
-local AREAS = {
-    {nome="Forest",         pos=Vector3.new(596.0, 68.0, -328.0)},
-    {nome="Lake",           pos=Vector3.new(744.0, 68.5, -408.0)},
-    {nome="Desert",         pos=Vector3.new(948.0, 69.5, -323.0)},
-    {nome="Jungle",         pos=Vector3.new(1188.0, 68.5, -408.0)},
-    {nome="Snow",           pos=Vector3.new(1492.0, 69.0, -315.0)},
-    {nome="Volcano",        pos=Vector3.new(1882.0, 68.0, -398.0)},
-    {nome="Abyss Ocean",    pos=Vector3.new(2280.0, 68.0, -326.0)},
-    {nome="Prehistoric",    pos=Vector3.new(2812.0, 69.0, -398.0)},
-    {nome="Cosmic",         pos=Vector3.new(3390.0, 68.0, -324.0)},
-    {nome="Cherry Blossom", pos=Vector3.new(4028.0, 68.5, -396.0)},
-    {nome="Titan Temple",   pos=Vector3.new(4796.0, 69.5, -328.0)},
-    {nome="Light Dark",     pos=Vector3.new(5660.0, 70.0, -331.0)},
-}
-
--- ============================================================
--- LOG
--- ============================================================
-local LOG = {}
-local logInicio = os.clock()
-local function addLog(msg)
-    local t = string.format("[%.2fs] %s", os.clock() - logInicio, tostring(msg))
-    table.insert(LOG, t)
-    print(t)
-end
-
--- ============================================================
--- BYPASS (Desync Lennon — sempre ON)
--- ============================================================
-local Bypass = {
-    Enabled = true, InProgress = false, Active = false,
-    Original = nil, OriginalState = nil, Fake = nil, Char = nil,
-    StateConn = nil,
-}
-
-local function dsSnapshot(h)
-    return {
-        Archivable = h.Archivable, BreakJointsOnDeath = h.BreakJointsOnDeath,
-        WalkSpeed = h.WalkSpeed, JumpPower = h.JumpPower,
-        JumpHeight = h.JumpHeight, UseJumpPower = h.UseJumpPower,
-        HipHeight = h.HipHeight, Health = h.Health,
-    }
-end
-
-function Bypass.Apply(character)
-    if not Bypass.Enabled or Bypass.InProgress then return false end
-    if Bypass.Active and Bypass.Fake and Bypass.Fake.Parent then return true end
-    Bypass.InProgress = true
-
-    character = character or LP.Character
-    if not character then Bypass.InProgress = false; return false end
-
-    local real = character:FindFirstChildOfClass("Humanoid")
-    if not real then Bypass.InProgress = false; return false end
-
-    Bypass.Char = character
-    Bypass.Original = real
-    Bypass.OriginalState = dsSnapshot(real)
-
-    real.Archivable = true
-    local fake = real:Clone()
-    fake.Name = "Humanoid"
-    fake.BreakJointsOnDeath = false
-    pcall(function() fake:SetStateEnabled(Enum.HumanoidStateType.Dead, false) end)
-    pcall(function() fake:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
-    pcall(function() fake:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
-    pcall(function() fake:SetStateEnabled(Enum.HumanoidStateType.Physics, false) end)
-    pcall(function() fake.RequiresNeck = false end)
-    fake.Health = fake.MaxHealth
-
-    local anim = real:FindFirstChildOfClass("Animator")
-    if anim then pcall(function() anim.Parent = fake end) end
-
-    real.Parent = nil
-    fake.Parent = character
-    fake.PlatformStand = false
-    fake.Sit = false
-    fake.AutoRotate = true
-
-    Bypass.StateConn = fake.StateChanged:Connect(function(_, new)
-        if new == Enum.HumanoidStateType.Ragdoll
-           or new == Enum.HumanoidStateType.FallingDown
-           or new == Enum.HumanoidStateType.Physics then
-            fake.PlatformStand = false
-            fake.Sit = false
-            pcall(function() fake:ChangeState(Enum.HumanoidStateType.GettingUp) end)
-        end
-    end)
-
-    pcall(function()
-        if Workspace.CurrentCamera then
-            Workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-            Workspace.CurrentCamera.CameraSubject = fake
-        end
-    end)
-
-    Bypass.Fake = fake
-    Bypass.Active = true
-    Bypass.InProgress = false
-    addLog("[BYPASS] ON")
-    return true
-end
-
-function Bypass.Remove()
-    if Bypass.InProgress then return end
-    Bypass.InProgress = true
-    if Bypass.StateConn then pcall(function() Bypass.StateConn:Disconnect() end); Bypass.StateConn = nil end
-
-    local char = Bypass.Char or LP.Character
-    local real = Bypass.Original
-    local fake = Bypass.Fake
-    if fake then pcall(function() fake:Destroy() end) end
-
-    if real and char then
-        real.Parent = char
-        local s = Bypass.OriginalState or {}
-        pcall(function()
-            real.Archivable = s.Archivable
-            real.BreakJointsOnDeath = s.BreakJointsOnDeath
-            real.WalkSpeed = s.WalkSpeed or real.WalkSpeed
-            real.JumpPower = s.JumpPower or real.JumpPower
-            real.JumpHeight = s.JumpHeight or real.JumpHeight
-            real.UseJumpPower = s.UseJumpPower
-            real.HipHeight = s.HipHeight or real.HipHeight
-            real.PlatformStand = false
-            real.AutoRotate = true
-            real.Sit = false
-            real.Health = math.min(s.Health or real.MaxHealth, real.MaxHealth)
-            real:ChangeState(Enum.HumanoidStateType.GettingUp)
-        end)
-        pcall(function()
-            if Workspace.CurrentCamera then
-                Workspace.CurrentCamera.CameraSubject = real
-            end
-        end)
-    end
-
-    Bypass.Original = nil
-    Bypass.OriginalState = nil
-    Bypass.Fake = nil
-    Bypass.Char = nil
-    Bypass.Active = false
-    Bypass.InProgress = false
-    Bypass.Enabled = true
-    addLog("[BYPASS] OFF")
-end
-
-function Bypass.IsActive()
-    return Bypass.Active and Bypass.Fake ~= nil and Bypass.Fake.Parent ~= nil
-end
-
-function Bypass.Reativar() Bypass.Enabled = true end
-_G.CroksBypass = Bypass
-
--- ============================================================
--- ANTI-RAGDOLL
--- ============================================================
-local AntiRagdollAtivo = true
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if AntiRagdollAtivo then
-            local c = LP.Character
-            local hum = Bypass.Fake or (c and c:FindFirstChildOfClass("Humanoid"))
-            if hum and hum.Parent then
-                pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end)
-                pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
-                pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false) end)
-                local st = hum:GetState()
-                if st == Enum.HumanoidStateType.Ragdoll
-                   or st == Enum.HumanoidStateType.Physics
-                   or st == Enum.HumanoidStateType.FallingDown then
-                    pcall(function() hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
-                end
-                if c then
-                    for _, m in ipairs(c:GetDescendants()) do
-                        if m:IsA("Motor6D") and not m.Enabled then
-                            pcall(function() m.Enabled = true end)
-                        end
-                    end
-                end
-            end
+-- Remove painel antigo se existir
+pcall(function()
+    for _, g in ipairs(PlayerGui:GetChildren()) do
+        if g:IsA("ScreenGui") and g.Name == "CroksUpdatePanel" then
+            g:Destroy()
         end
     end
 end)
 
--- ============================================================
--- ANTI-TRAP
--- ============================================================
-local AntiTrapAtivo = true
-task.spawn(function()
-    while true do
-        task.wait(0.3)
-        if AntiTrapAtivo then
-            for _, trap in ipairs(CS:GetTagged("PlacedTrap")) do
-                local hb = trap:FindFirstChild("Hitbox")
-                if hb and hb:IsA("BasePart") and hb.CanTouch then
-                    pcall(function() hb.CanTouch = false end)
-                end
-            end
-        end
-    end
-end)
-CS:GetInstanceAddedSignal("PlacedTrap"):Connect(function(trap)
-    if AntiTrapAtivo and trap:GetAttribute("Owner") ~= LP.Name then
-        task.defer(function()
-            local hb = trap:FindFirstChild("Hitbox")
-            if hb and hb:IsA("BasePart") then pcall(function() hb.CanTouch = false end) end
-        end)
-    end
-end)
+-- ScreenGui do painel
+local updateGui = Instance.new("ScreenGui")
+updateGui.Name = "CroksUpdatePanel"
+updateGui.ResetOnSpawn = false
+updateGui.IgnoreGuiInset = true
+updateGui.DisplayOrder = 999999
+updateGui.Parent = PlayerGui
+
+-- Painel principal
+local panel = Instance.new("Frame", updateGui)
+panel.Size = UDim2.new(0, 320, 0, 200)
+panel.Position = UDim2.new(1, 340, 0.5, -100)  -- começa FORA da tela (direita)
+panel.BackgroundColor3 = Color3.fromRGB(12, 3, 3)
+panel.BackgroundTransparency = 0.05
+panel.BorderSizePixel = 0
+panel.Active = true
+panel.Draggable = true
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 14)
+
+-- Imagem de fundo (arte do Croks)
+local bgImg = Instance.new("ImageLabel", panel)
+bgImg.Size = UDim2.new(1, 0, 1, 0)
+bgImg.BackgroundColor3 = Color3.fromRGB(12, 3, 3)
+bgImg.BackgroundTransparency = 0
+bgImg.Image = IMG_FUNDO
+bgImg.ImageTransparency = 0.5
+bgImg.ScaleType = Enum.ScaleType.Crop
+bgImg.ZIndex = 1
+bgImg.Parent = panel
+Instance.new("UICorner", bgImg).CornerRadius = UDim.new(0, 14)
+
+-- Overlay escuro (deixa a arte sutil)
+local overlay = Instance.new("Frame", panel)
+overlay.Size = UDim2.new(1, 0, 1, 0)
+overlay.BackgroundColor3 = Color3.fromRGB(10, 2, 2)
+overlay.BackgroundTransparency = 0.35
+overlay.BorderSizePixel = 0
+overlay.ZIndex = 2
+Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 14)
+
+-- Borda gradiente vermelha
+local stroke = Instance.new("UIStroke", panel)
+stroke.Color = Color3.fromRGB(200, 30, 30)
+stroke.Thickness = 2
+stroke.ZIndex = 3
+local strokeGrad = Instance.new("UIGradient", stroke)
+strokeGrad.Color = ColorSequence.new(Color3.fromRGB(255, 80, 80), Color3.fromRGB(255, 180, 60))
+strokeGrad.Rotation = 45
+
+-- Ícone do Croks (topo)
+local icon = Instance.new("ImageLabel", panel)
+icon.Size = UDim2.new(0, 50, 0, 50)
+icon.Position = UDim2.new(0.5, -25, 0, 12)
+icon.BackgroundTransparency = 1
+icon.Image = IMG_ICONE
+icon.ScaleType = Enum.ScaleType.Fit
+icon.ZIndex = 10
+
+-- Título
+local title = Instance.new("TextLabel", panel)
+title.Size = UDim2.new(1, -20, 0, 28)
+title.Position = UDim2.new(0, 10, 0, 68)
+title.BackgroundTransparency = 1
+title.Text = "🎉 CROKS HUB UPDATE 🎉"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 16
+title.ZIndex = 10
+local titleGrad = Instance.new("UIGradient", title)
+titleGrad.Color = ColorSequence.new(Color3.fromRGB(255, 100, 100), Color3.fromRGB(255, 200, 80))
+titleGrad.Rotation = 90
+
+-- Subtítulo
+local subtitle = Instance.new("TextLabel", panel)
+subtitle.Size = UDim2.new(1, -20, 0, 16)
+subtitle.Position = UDim2.new(0, 10, 0, 96)
+subtitle.BackgroundTransparency = 1
+subtitle.Text = "Novidades no script! Entre no Discord"
+subtitle.TextColor3 = Color3.fromRGB(220, 190, 190)
+subtitle.Font = Enum.Font.GothamSemibold
+subtitle.TextSize = 11
+subtitle.ZIndex = 10
+
+-- Botão COPIAR DISCORD
+local copyBtn = Instance.new("TextButton", panel)
+copyBtn.Size = UDim2.new(1, -40, 0, 40)
+copyBtn.Position = UDim2.new(0, 20, 0, 122)
+copyBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
+copyBtn.BackgroundTransparency = 0.05
+copyBtn.Text = "📋 COPIAR DISCORD"
+copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyBtn.Font = Enum.Font.GothamBlack
+copyBtn.TextSize = 13
+copyBtn.BorderSizePixel = 0
+copyBtn.AutoButtonColor = false
+copyBtn.ZIndex = 10
+Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 10)
+local copyStroke = Instance.new("UIStroke", copyBtn)
+copyStroke.Color = Color3.fromRGB(255, 100, 100)
+copyStroke.Thickness = 1.5
+
+-- Feedback (texto que aparece depois de copiar)
+local feedback = Instance.new("TextLabel", panel)
+feedback.Size = UDim2.new(1, -20, 0, 14)
+feedback.Position = UDim2.new(0, 10, 0, 168)
+feedback.BackgroundTransparency = 1
+feedback.Text = ""
+feedback.TextColor3 = Color3.fromRGB(120, 255, 170)
+feedback.Font = Enum.Font.GothamBold
+feedback.TextSize = 10
+feedback.ZIndex = 10
+
+-- Botão X pra fechar
+local closeBtn = Instance.new("TextButton", panel)
+closeBtn.Size = UDim2.new(0, 24, 0, 24)
+closeBtn.Position = UDim2.new(1, -32, 0, 8)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.Font = Enum.Font.GothamBlack
+closeBtn.TextSize = 12
+closeBtn.BorderSizePixel = 0
+closeBtn.AutoButtonColor = false
+closeBtn.ZIndex = 11
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(1, 0)
 
 -- ============================================================
--- AUTO BAT
+-- ANIMAÇÃO DE ENTRADA (desliza da direita pra esquerda)
 -- ============================================================
-local AutoBatAtivo = false
-
-local function getNearestPlayer()
-    local char = LP.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil end
-    local best, bestDist = nil, CONFIG.BAT_RANGE
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LP then
-            local c = plr.Character
-            local h = c and c:FindFirstChild("HumanoidRootPart")
-            local hum = c and c:FindFirstChildOfClass("Humanoid")
-            if h and hum and hum.Health > 0 then
-                local d = (h.Position - hrp.Position).Magnitude
-                if d < bestDist then bestDist = d; best = c end
-            end
-        end
-    end
-    return best
-end
-
-local function tryAttack(target)
-    local char = LP.Character
-    if not char or not target then return end
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool and tool:FindFirstChild("Handle") then
-        pcall(function() tool:Activate() end)
-    end
-    for _, o in ipairs(target:GetDescendants()) do
-        if o:IsA("ProximityPrompt") then
-            pcall(function() fireproximityprompt(o, 0) end)
-        end
-    end
-    local net = RS:FindFirstChild("Packages")
-    net = net and net:FindFirstChild("Networking")
-    if net then
-        for _, r in ipairs(net:GetChildren()) do
-            if r:IsA("RemoteEvent") and (r.Name:lower():find("hit") or r.Name:lower():find("attack")) then
-                pcall(function() r:FireServer(target) end)
-            end
-        end
-    end
-end
-
-task.spawn(function()
-    while true do
-        task.wait(0.05)
-        if AutoBatAtivo then
-            local tgt = getNearestPlayer()
-            if tgt then
-                tryAttack(tgt)
-                task.wait(CONFIG.BAT_CD)
-            end
-        end
-    end
-end)
+task.wait(0.5)
+TweenService:Create(panel, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Position = UDim2.new(1, -340, 0.5, -100)
+}):Play()
 
 -- ============================================================
--- NETWORKING
+-- FUNÇÕES DOS BOTÕES
 -- ============================================================
-local net = RS:FindFirstChild("Packages")
-net = net and net:FindFirstChild("Networking")
 
-local Carry, Drop, Snapshot
-if net then
-    Carry    = net:FindFirstChild("RF/EggWorld/AskFieldEggCarry")
-    Drop     = net:FindFirstChild("RF/EggWorld/AskFieldEggDrop")
-    Snapshot = net:FindFirstChild("RF/EggWorld/AskFieldEggSnapshot")
-end
-
--- ============================================================
--- TP HELPER
--- ============================================================
-local function TeleportarPara(destino)
-    local char = LP.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    pcall(function()
-        hrp.CFrame = CFrame.new(destino + Vector3.new(0, 3, 0))
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
-    end)
-    task.wait(0.2)
-    return true
-end
-
--- ============================================================
--- PEGAR OVO (por Uid)
--- ============================================================
-local function PegarOvoPorUid(uid)
-    if not Carry or not uid then return false end
-    local ok, r = pcall(function() return Carry:InvokeServer({Uid = uid}) end)
-    return ok and r == true
-end
-
-local function SoltarOvo()
-    if not Drop then return false end
-    local ok = pcall(function() Drop:InvokeServer({Reason = "PlayerRequest"}) end)
-    return ok
-end
-
--- ============================================================
--- LISTAR OVOS (Snapshot)
--- ============================================================
-local function ListarOvos()
-    if not Snapshot then return {} end
-    local ok, r = pcall(function() return Snapshot:InvokeServer() end)
-    if not ok or not r or not r.Records then return {} end
-    local ovos = {}
-    for _, rec in ipairs(r.Records) do
-        if rec.State == "Slot" or rec.State == "Dropped" then
-            local pos = rec.BottomCFrame and rec.BottomCFrame.Position
-            if pos then
-                table.insert(ovos, {
-                    Uid = rec.Uid,
-                    Category = rec.AssetCategory,
-                    Area = rec.AreaId,
-                    Scale = rec.AssetScale,
-                    Pos = pos,
-                    Value = (rec.AssetScale or 1),
-                })
-            end
-        end
-    end
-    table.sort(ovos, function(a, b) return a.Value > b.Value end)
-    return ovos
-end
-
--- ============================================================
--- ACHAR GUARDIÃO DA ÁREA
--- ============================================================
-local function AcharGuardiao(areaNome)
-    local world = workspace:FindFirstChild("World")
-    if not world then return nil end
-    local areas = world:FindFirstChild("Areas")
-    if not areas then return nil end
-    local ga = areas:FindFirstChild("GuardAreas")
-    if not ga then return nil end
-    local area = ga:FindFirstChild(areaNome)
-    if not area then return nil end
-    return area:FindFirstChild("Guard")
-end
-
-local function GuardState(guard)
-    if not guard then return "nil" end
-    return guard:GetAttribute("GuardState") or "nil"
-end
-
-addLog("[INIT] Base carregada")
--- ============================================================
--- AUTO STEAL — Melhor ovo → galinha → SafeZone
--- ============================================================
-local AutoStealLigado = false
-local CicloAndando = false
-local TemOvo = false
-local UidAtual = nil
-
-if net then
-    local FEC = net:FindFirstChild("RE/EggWorld/FieldEggCarry")
-    if FEC and FEC:IsA("RemoteEvent") then
-        FEC.OnClientEvent:Connect(function(dados)
-            TemOvo = true
-            if type(dados) == "table" and dados.Uid then
-                UidAtual = dados.Uid
-            end
-        end)
-    end
-    local FED = net:FindFirstChild("RE/EggWorld/FieldEggDrop")
-    if FED and FED:IsA("RemoteEvent") then
-        FED.OnClientEvent:Connect(function()
-            TemOvo = false
-            UidAtual = nil
-        end)
-    end
-end
-
-local function PegarMelhorOvo()
-    local ovos = ListarOvos()
-    if #ovos == 0 then return nil end
-    return ovos[1]
-end
-
-local function CicloAutoSteal()
-    if CicloAndando then return end
-    if not AutoStealLigado then return end
-    CicloAndando = true
-
-    task.spawn(function()
-        addLog("[CICLO] Iniciando...")
-        Bypass.Reativar()
-        Bypass.Apply(LP.Character)
-        task.wait(0.5)
-
-        while AutoStealLigado do
-            -- 1. Lista ovos, pega o melhor
-            local melhor = PegarMelhorOvo()
-            if not melhor then
-                StatusLabel.Text = "Nenhum ovo — esperando mapa"
-                StatusLabel.TextColor3 = Color3.fromRGB(240, 180, 60)
-                addLog("[CICLO] Sem ovos, esperando 5s")
-                task.wait(5)
-                continue
-            end
-
-            addLog("[CICLO] Melhor: " .. tostring(melhor.Category) .. " | " .. tostring(melhor.Area))
-
-            -- 2. TP até o melhor ovo
-            StatusLabel.Text = "TP pro melhor ovo..."
-            StatusLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
-            TeleportarPara(melhor.Pos)
-            task.wait(0.5)
-
-            -- 3. Pega o ovo
-            StatusLabel.Text = "Pegando ovo..."
-            StatusLabel.TextColor3 = Color3.fromRGB(240, 180, 60)
-            local pegou = PegarOvoPorUid(melhor.Uid)
-            addLog("[CICLO] Pegar: " .. tostring(pegou))
-
-            if pegou then
-                -- 4. Espera guardião bater (ovo dropa)
-                StatusLabel.Text = "Ovo pego! Esperando guardião..."
-                StatusLabel.TextColor3 = Color3.fromRGB(50, 230, 140)
-
-                local t0 = tick()
-                while AutoStealLigado and TemOvo and (tick() - t0) < CONFIG.ESPERA_KNOCK do
-                    task.wait(0.1)
-                end
-
-                if TemOvo then
-                    addLog("[CICLO] Guard não bateu (timeout)")
-                else
-                    addLog("[CICLO] Ovo dropou!")
-                end
-
-                -- 5. TP pra SafeZone
-                StatusLabel.Text = "TP pra SafeZone..."
-                StatusLabel.TextColor3 = Color3.fromRGB(120, 200, 255)
-                task.wait(0.3)
-                TeleportarPara(CONFIG.SAFEZONE_POS)
-                task.wait(1)
-
-                -- 6. Entrega (dropa)
-                SoltarOvo()
-                addLog("[CICLO] Entregou na SafeZone")
-                task.wait(1)
-            else
-                addLog("[CICLO] Falha ao pegar — próximo")
-                task.wait(1)
-            end
-        end
-
-        StatusLabel.Text = "Ciclo parado"
-        StatusLabel.TextColor3 = C.textDim
-        CicloAndando = false
-    end)
-end
-
--- ============================================================
--- UI
--- ============================================================
-local parent
-if gethui then local ok, h = pcall(gethui); if ok and h then parent = h end end
-if not parent then
-    local ok, cg = pcall(function() return game:GetService("CoreGui") end)
-    if ok and cg then parent = cg end
-end
-if not parent then parent = LP:WaitForChild("PlayerGui") end
-
-local C = {
-    bg      = Color3.fromRGB(8, 10, 16),
-    panel   = Color3.fromRGB(14, 17, 26),
-    accent  = Color3.fromRGB(120, 70, 240),
-    accent2 = Color3.fromRGB(70, 160, 255),
-    success = Color3.fromRGB(50, 230, 140),
-    off     = Color3.fromRGB(45, 50, 65),
-    off2    = Color3.fromRGB(30, 35, 50),
-    text    = Color3.fromRGB(255, 255, 255),
-    textDim = Color3.fromRGB(160, 175, 200),
-    border  = Color3.fromRGB(35, 45, 70),
-}
-
-local SG = Instance.new("ScreenGui")
-SG.Name = "CroksHub"
-SG.ResetOnSpawn = false
-SG.IgnoreGuiInset = true
-SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-SG.Parent = parent
-
-local BtnFloat = Instance.new("TextButton", SG)
-BtnFloat.Size = UDim2.new(0,54,0,54)
-BtnFloat.Position = UDim2.new(0,18,0.5,-27)
-BtnFloat.BackgroundColor3 = C.accent
-BtnFloat.Text = "CH"
-BtnFloat.TextColor3 = C.text
-BtnFloat.Font = Enum.Font.GothamBlack
-BtnFloat.TextSize = 18
-BtnFloat.BorderSizePixel = 0
-BtnFloat.AutoButtonColor = false
-BtnFloat.Active = true
-Instance.new("UICorner", BtnFloat).CornerRadius = UDim.new(1,0)
-local FS = Instance.new("UIStroke", BtnFloat)
-FS.Color = C.accent2; FS.Thickness = 2; FS.Transparency = 0.3
-
-local Main = Instance.new("Frame", SG)
-Main.Size = UDim2.new(0, 280, 0, 360)
-Main.Position = UDim2.new(0.5, -140, 0.5, -180)
-Main.BackgroundColor3 = C.bg
-Main.BorderSizePixel = 0
-Main.Active = true
-Main.Visible = false
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
-local MS = Instance.new("UIStroke", Main)
-MS.Color = C.border; MS.Thickness = 1.5
-
-local Head = Instance.new("Frame", Main)
-Head.Size = UDim2.new(1, 0, 0, 52)
-Head.BackgroundColor3 = C.panel
-Head.BorderSizePixel = 0
-Head.Active = true
-Instance.new("UICorner", Head).CornerRadius = UDim.new(0, 12)
-local HG = Instance.new("UIGradient", Head)
-HG.Color = ColorSequence.new(C.accent, C.accent2)
-
-local Titulo = Instance.new("TextLabel", Head)
-Titulo.Size = UDim2.new(0,180,0,24)
-Titulo.Position = UDim2.new(0,14,0,10)
-Titulo.BackgroundTransparency = 1
-Titulo.Text = "CROKS HUB"
-Titulo.TextColor3 = C.text
-Titulo.Font = Enum.Font.GothamBlack
-Titulo.TextSize = 17
-Titulo.TextXAlignment = Enum.TextXAlignment.Left
-
-local Sub = Instance.new("TextLabel", Head)
-Sub.Size = UDim2.new(0,180,0,12)
-Sub.Position = UDim2.new(0,15,0,32)
-Sub.BackgroundTransparency = 1
-Sub.Text = "Auto Steal (melhor ovo) + Auto Bat"
-Sub.TextColor3 = C.textDim
-Sub.Font = Enum.Font.GothamMedium
-Sub.TextSize = 9
-Sub.TextXAlignment = Enum.TextXAlignment.Left
-
-local BtnMin = Instance.new("TextButton", Head)
-BtnMin.Size = UDim2.new(0,26,0,26)
-BtnMin.Position = UDim2.new(1,-60,0,13)
-BtnMin.BackgroundColor3 = Color3.fromRGB(0,0,0)
-BtnMin.BackgroundTransparency = 0.55
-BtnMin.Text = "-"
-BtnMin.TextColor3 = C.text
-BtnMin.Font = Enum.Font.GothamBold
-BtnMin.TextSize = 14
-BtnMin.BorderSizePixel = 0
-BtnMin.AutoButtonColor = false
-Instance.new("UICorner", BtnMin).CornerRadius = UDim.new(0,6)
-
-local BtnClose = Instance.new("TextButton", Head)
-BtnClose.Size = UDim2.new(0,26,0,26)
-BtnClose.Position = UDim2.new(1,-30,0,13)
-BtnClose.BackgroundColor3 = Color3.fromRGB(0,0,0)
-BtnClose.BackgroundTransparency = 0.55
-BtnClose.Text = "X"
-BtnClose.TextColor3 = C.text
-BtnClose.Font = Enum.Font.GothamBold
-BtnClose.TextSize = 12
-BtnClose.BorderSizePixel = 0
-BtnClose.AutoButtonColor = false
-Instance.new("UICorner", BtnClose).CornerRadius = UDim.new(0,6)
-
-do
-    local drag, ds, sp
-    Head.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-           or i.UserInputType == Enum.UserInputType.Touch then
-            local mx, my = i.Position.X, i.Position.Y
-            local function hit(b)
-                local bp, bs = b.AbsolutePosition, b.AbsoluteSize
-                return mx >= bp.X and mx <= bp.X + bs.X and my >= bp.Y and my <= bp.Y + bs.Y
-            end
-            if hit(BtnMin) or hit(BtnClose) then return end
-            drag = true; ds = i.Position; sp = Main.Position
-        end
-    end)
-    UIS.InputChanged:Connect(function(i)
-        if not drag then return end
-        if i.UserInputType == Enum.UserInputType.MouseMovement
-           or i.UserInputType == Enum.UserInputType.Touch then
-            local d = i.Position - ds
-            Main.Position = UDim2.new(sp.X.Scale, sp.X.Offset + d.X,
-                                      sp.Y.Scale, sp.Y.Offset + d.Y)
-        end
-    end)
-    UIS.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1
-           or i.UserInputType == Enum.UserInputType.Touch then
-            drag = false
-        end
-    end)
-end
-
-local function Botao(pai, y, txt, cor1, cor2, strokeCor)
-    local b = Instance.new("TextButton", pai)
-    b.Size = UDim2.new(1, -20, 0, 42)
-    b.Position = UDim2.new(0, 10, 0, y)
-    b.BackgroundColor3 = cor1
-    b.Text = ""
-    b.BorderSizePixel = 0
-    b.AutoButtonColor = false
-    b.ClipsDescendants = true
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
-    local g = Instance.new("UIGradient", b)
-    g.Color = ColorSequence.new(cor1, cor2)
-    local s = Instance.new("UIStroke", b)
-    s.Color = strokeCor; s.Thickness = 1; s.Transparency = 0.5
-    local tx = Instance.new("TextLabel", b)
-    tx.Size = UDim2.new(1,0,1,0)
-    tx.BackgroundTransparency = 1
-    tx.Text = txt
-    tx.TextColor3 = C.text
-    tx.Font = Enum.Font.GothamBold
-    tx.TextSize = 14
-    tx.ZIndex = 3
-    return b, g, s, tx
-end
-
-local BtnAuto, GAuto, SAuto, TAuto = Botao(Main, 62, "AUTO STEAL  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
-local BtnAT, GAT, SAT, TAT = Botao(Main, 112, "Anti-Trap  -  ON", C.success, C.accent2, Color3.fromRGB(120,255,170))
-local BtnAutoBat, GAB, SAB, TAB = Botao(Main, 162, "AUTO BAT  -  OFF", C.off, C.off2, Color3.fromRGB(100,100,120))
-local BtnRag, GRag, SRag, TRag = Botao(Main, 212, "Anti-Ragdoll  -  ON", C.success, C.accent2, Color3.fromRGB(120,255,170))
-local BtnLog, GLog, SLog, TLog = Botao(Main, 262, "📋 COPIAR LOG", C.accent, C.accent2, Color3.fromRGB(180,130,255))
-
-local StatusLabel = Instance.new("TextLabel", Main)
-StatusLabel.Size = UDim2.new(1,-20,0,32)
-StatusLabel.Position = UDim2.new(0,10,0,312)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Pronto"
-StatusLabel.TextColor3 = C.textDim
-StatusLabel.Font = Enum.Font.GothamBold
-StatusLabel.TextSize = 10
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.TextWrapped = true
-
--- TOGGLES
-local function ToggleAuto()
-    AutoStealLigado = not AutoStealLigado
-    if AutoStealLigado then
-        TAuto.Text = "AUTO STEAL  -  ON"
-        BtnAuto.BackgroundColor3 = C.success
-        GAuto.Color = ColorSequence.new(C.success, C.accent2)
-        CicloAutoSteal()
-    else
-        TAuto.Text = "AUTO STEAL  -  OFF"
-        BtnAuto.BackgroundColor3 = C.off
-        GAuto.Color = ColorSequence.new(C.off, C.off2)
-        StatusLabel.Text = "Auto Steal OFF"
-    end
-end
-
-local function ToggleAntiTrap()
-    AntiTrapAtivo = not AntiTrapAtivo
-    TAT.Text = AntiTrapAtivo and "Anti-Trap  -  ON" or "Anti-Trap  -  OFF"
-    BtnAT.BackgroundColor3 = AntiTrapAtivo and C.success or C.off
-    GAT.Color = AntiTrapAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
-end
-
-local function ToggleAutoBat()
-    AutoBatAtivo = not AutoBatAtivo
-    TAB.Text = AutoBatAtivo and "AUTO BAT  -  ON" or "AUTO BAT  -  OFF"
-    BtnAutoBat.BackgroundColor3 = AutoBatAtivo and C.success or C.off
-    GAB.Color = AutoBatAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
-end
-
-local function ToggleRag()
-    AntiRagdollAtivo = not AntiRagdollAtivo
-    TRag.Text = AntiRagdollAtivo and "Anti-Ragdoll  -  ON" or "Anti-Ragdoll  -  OFF"
-    BtnRag.BackgroundColor3 = AntiRagdollAtivo and C.success or C.off
-    GRag.Color = AntiRagdollAtivo and ColorSequence.new(C.success, C.accent2) or ColorSequence.new(C.off, C.off2)
-end
-
-local function CopiarLog()
-    local texto = table.concat(LOG, "\n")
+-- Copiar Discord
+copyBtn.MouseButton1Click:Connect(function()
     local ok = false
-    if setclipboard then ok = pcall(setclipboard, texto)
-    elseif toclipboard then ok = pcall(toclipboard, texto) end
+    if setclipboard then ok = pcall(setclipboard, DISCORD_LINK)
+    elseif toclipboard then ok = pcall(toclipboard, DISCORD_LINK) end
+
     if ok then
-        TLog.Text = "✓ COPIADO!"
-        BtnLog.BackgroundColor3 = C.success
-        task.delay(1.5, function()
-            TLog.Text = "📋 COPIAR LOG"
-            BtnLog.BackgroundColor3 = C.accent
+        feedback.Text = "✓ Discord copiado!"
+        feedback.TextColor3 = Color3.fromRGB(120, 255, 170)
+        copyBtn.Text = "✓ COPIADO!"
+        copyBtn.BackgroundColor3 = Color3.fromRGB(50, 210, 100)
+        task.delay(2, function()
+            feedback.Text = ""
+            copyBtn.Text = "📋 COPIAR DISCORD"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
         end)
     else
-        TLog.Text = "✗ FALHOU"
-        BtnLog.BackgroundColor3 = Color3.fromRGB(240, 80, 80)
-        task.delay(1.5, function()
-            TLog.Text = "📋 COPIAR LOG"
-            BtnLog.BackgroundColor3 = C.accent
+        feedback.Text = "Link: discord.gg/dDqdH8tJdM"
+        feedback.TextColor3 = Color3.fromRGB(255, 200, 100)
+        task.delay(4, function()
+            feedback.Text = ""
         end)
     end
-end
+end)
 
-BtnAuto.MouseButton1Click:Connect(ToggleAuto)
-BtnAT.MouseButton1Click:Connect(ToggleAntiTrap)
-BtnAutoBat.MouseButton1Click:Connect(ToggleAutoBat)
-BtnRag.MouseButton1Click:Connect(ToggleRag)
-BtnLog.MouseButton1Click:Connect(CopiarLog)
-
--- ABRIR/FECHAR
-local aberto = false
-local function abrir()
-    if aberto then return end
-    aberto = true
-    BtnFloat.Visible = false
-    Main.Visible = true
-    Main.Size = UDim2.new(0,0,0,0)
-    Main.Position = UDim2.new(0.5,0,0.5,0)
-    TS:Create(Main, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.new(0,280,0,360),
-        Position = UDim2.new(0.5,-140,0.5,-180)
-    }):Play()
-end
-
-local function fechar()
-    if not aberto then return end
-    aberto = false
-    local tw = TS:Create(Main, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-        Size = UDim2.new(0,0,0,0),
-        Position = UDim2.new(0.5,0,0.5,0)
+-- Fechar painel
+closeBtn.MouseButton1Click:Connect(function()
+    local tw = TweenService:Create(panel, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        Position = UDim2.new(1, 400, 0.5, -100),
+        BackgroundTransparency = 1
     })
     tw:Play()
-    tw.Completed:Connect(function()
-        Main.Visible = false
-        BtnFloat.Visible = true
-    end)
-end
-
-BtnMin.MouseButton1Click:Connect(fechar)
-BtnClose.MouseButton1Click:Connect(function() SG:Destroy() end)
-
-local arr, mov, off = false, false, Vector2.new()
-BtnFloat.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-        arr = true; mov = false
-        off = Vector2.new(i.Position.X - BtnFloat.AbsolutePosition.X,
-                          i.Position.Y - BtnFloat.AbsolutePosition.Y)
-    end
-end)
-UIS.InputChanged:Connect(function(i)
-    if arr and (i.UserInputType == Enum.UserInputType.MouseMovement
-       or i.UserInputType == Enum.UserInputType.Touch) then
-        local np = Vector2.new(i.Position.X - off.X, i.Position.Y - off.Y)
-        if (np - BtnFloat.AbsolutePosition).Magnitude > 5 then mov = true end
-        BtnFloat.Position = UDim2.new(0, np.X, 0, np.Y)
-    end
-end)
-UIS.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1
-       or i.UserInputType == Enum.UserInputType.Touch then
-        if arr and not mov then abrir() end
-        arr = false
-    end
+    tw.Completed:Wait()
+    updateGui:Destroy()
 end)
 
--- Bypass sempre ON
-Bypass.Reativar()
-Bypass.Apply(LP.Character)
-
-task.wait(0.5)
-abrir()
-
-print("[Croks Hub v33] Carregado — Auto Steal melhor ovo + Bypass ON")
+print("[CROKS] Painel de update carregado")
